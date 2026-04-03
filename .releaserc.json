@@ -1,5 +1,5 @@
 {
-  "repositoryUrl": "https://github.com/NoTIPswe/notip-simulator-frontend.git",
+  "repositoryUrl": "https://github.com/NoTIPswe/notip-simulator-cli.git",
   "branches": ["main"],
   "plugins": [
     [
@@ -18,11 +18,10 @@
     ],
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
-    ["@semantic-release/npm", { "npmPublish": false }],
     [
       "@semantic-release/git",
       {
-        "assets": ["CHANGELOG.md", "package.json"],
+        "assets": ["CHANGELOG.md"],
         "message": "chore(release): ${nextRelease.version} [skip ci]"
       }
     ],

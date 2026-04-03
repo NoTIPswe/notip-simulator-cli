@@ -1,44 +1,36 @@
-# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# --- Build Outputs ---
+sim-cli
+tmp/
 
-# Compiled output
-/dist
-/tmp
-/out-tsc
-/bazel-out
+# --- Test & Coverage ---
+coverage.out
+coverage/
 
-# Node
-/node_modules
-npm-debug.log
-yarn-error.log
+# --- Environment Variables (IMPORTANT!) ---
+.env
+.env.local
+.env.*.local
+*.env
 
-# IDEs and editors
-.idea/
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/mcp.json
-.history/*
-
-# Miscellaneous
-/.angular/cache
-.sass-cache/
-/connect.lock
-/coverage
-/libpeerconnection.log
-testem.log
-/typings
-__screenshots__/
-
-# System files
+# --- macOS ---
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
+
+# --- IDEs / Editor ---
+.idea/
+.vscode/
+
+# --- Temporary Files ---
+*.tmp
+*.temp
+.cache/
+
+# --- Certs ---
+certs/
+
+# --- Ignored folder ---
+ignored/
+
+# --- npm semantic versioning ---
+node_modules

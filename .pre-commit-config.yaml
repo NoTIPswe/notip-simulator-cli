@@ -1,28 +1,26 @@
 repos:
+
   - repo: local
     hooks:
-      - id: eslint
-        name: ESLint
-        entry: npm run lint:check
+      - id: gofmt
+        name: gofmt
+        entry: bash -c 'test -z "$(gofmt -l .)"'
         language: system
-        types: [file]
-        files: \.(ts|html)$
         pass_filenames: false
 
-      - id: prettier
-        name: Prettier
-        entry: npm run format:check
+      - id: go-vet
+        name: go vet
+        entry: go vet ./...
         language: system
         pass_filenames: false
-      
-      - id: tsc
-        name: Type check
-        entry: npm run typecheck
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run
         language: system
-        types: [file]
-        files: \.(ts)$
+        types: [go]
         pass_filenames: false
-  
+
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:

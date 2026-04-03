@@ -1,27 +1,34 @@
 {
-	"name": "NoTIP Angular Dev",
+	"name": "NoTIP Go Simulator Dev",
 
-	"image": "ghcr.io/notipswe/notip-angular-dev:v0.0.1",
+	"image": "ghcr.io/notipswe/notip-go-dev:v0.0.1",
 
-	"postCreateCommand": "[ -f package.json ] && npm install; pre-commit install --install-hooks",
+	"postCreateCommand": "pre-commit install --install-hooks",
 	"init": true,
+
+	"features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {},
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "moby": false,
+            "installDockerBuildx": true,
+            "dockerDashComposeVersion": "v2"
+        }
+    },
 
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"dbaeumer.vscode-eslint",
-				"esbenp.prettier-vscode",
-				"firsttris.vscode-jest-runner",
+				"golang.go",
 				"SonarSource.sonarlint-vscode",
-				"ms-azuretools.vscode-containers",
-				"Angular.ng-template"
+				"ms-azuretools.vscode-containers"
 			]
 		}
 	},
 
-	"forwardPorts": [4200],
+	"forwardPorts": [8080],
 
-	"workspaceFolder": "/workspaces/notip-simulator-frontend",
-	"updateRemoteUserUID": true,
-	"remoteUser": "node"
+	"workspaceFolder": "/workspaces/notip-simulator-cli",
+	"remoteUser": "dev",
+	"updateRemoteUserUID": true
 }

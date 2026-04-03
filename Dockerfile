@@ -1,28 +1,29 @@
-# Builder
-FROM ghcr.io/notipswe/notip-angular-base:v0.0.1 AS builder
+# ─── Builder (CI/CD) ────────────────────────────────────────────────────────
+FROM ghcr.io/notipswe/notip-go-base:v0.0.1 AS builder
 
-USER node
-WORKDIR /app
-COPY --chown=node:node package*.json ./
-RUN npm ci
-
-COPY --chown=node:node . .
-
-RUN npm run build -- --configuration production --output-path=dist-generic
-
-
-# Production
-FROM nginxinc/nginx-unprivileged:1-alpine AS prod
-
-USER root
 WORKDIR /app
 
-COPY --chown=nginx:nginx --from=builder /app/dist-generic/browser /usr/share/nginx/html
+COPY go.mod go.sum ./
+RUN go mod download
 
-USER nginx
-EXPOSE 8080
+COPY . .
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
+RUN CGO_ENABLED=0 GOOS=linux go build -o sim-cli .
 
-CMD ["nginx", "-g", "daemon off;"]
+# ─── Production ─────────────────────────────────────────────────────────────
+FROM ghcr.io/notipswe/notip-go-base:v0.0.1 AS prod
+
+LABEL org.opencontainers.image.source="https://github.com/NoTIPswe/notip-simulator-cli" \
+  org.opencontainers.image.description="NoTIP Simulator CLI" \
+      org.opencontainers.image.licenses="MIT"
+
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --chown=appuser:appuser --from=builder /app/sim-cli .
+
+USER appuser
+
+ENTRYPOINT ["./sim-cli"]
+CMD ["--help"]

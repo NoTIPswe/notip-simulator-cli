@@ -26,8 +26,6 @@ jobs:
     name: Semantic Release
     needs: quality-checks
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/notipswe/notip-angular-dev:v0.0.1
     outputs:
       released: ${{ steps.semantic.outputs.released }}
       version: ${{ steps.semantic.outputs.version }}
@@ -43,16 +41,22 @@ jobs:
       - name: Configure git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Cache npm cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.npm
-          key: npm-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            npm-cache-${{ runner.os }}-
+      - name: Validate semantic-release token
+        env:
+          SEMANTIC_RELEASE_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
+        run: |
+          if [ -z "$SEMANTIC_RELEASE_TOKEN" ]; then
+            echo "SEMANTIC_RELEASE_TOKEN is required for semantic-release push on protected main"
+            exit 1
+          fi
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install semantic-release plugins
+        run: npm install --ignore-scripts
 
       - name: Run Semantic Release
         id: semantic
@@ -64,11 +68,13 @@ jobs:
           GIT_COMMITTER_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
         run: |
-          PREV_VERSION=$(node -p "require('./package.json').version")
+          PREV_TAG=$(git tag --sort=-v:refname | head -1 || echo "none")
           npx semantic-release
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          if [ "$NEW_VERSION" != "$PREV_VERSION" ]; then
-            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          git fetch --tags
+          NEW_TAG=$(git tag --sort=-v:refname | head -1 || echo "none")
+          if [ "$NEW_TAG" != "$PREV_TAG" ] && [ "$NEW_TAG" != "none" ]; then
+            VERSION=$(echo "$NEW_TAG" | sed 's/^v//')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "released=true" >> $GITHUB_OUTPUT
           else
             echo "released=false" >> $GITHUB_OUTPUT
@@ -109,6 +115,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          target: prod
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
