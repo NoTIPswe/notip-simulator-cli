@@ -26,7 +26,7 @@ var gatewaysListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all gateways and their current status",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		spinner, _ := pterm.DefaultSpinner.Start("Fetching gateways...")
+		spinner := startSpinner("Fetching gateways...")
 
 		c := client.New(simulatorURL)
 		gateways, err := c.ListGateways()
@@ -66,7 +66,7 @@ var gatewaysGetCmd = &cobra.Command{
 	Short: "Show details for a single gateway",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		spinner, _ := pterm.DefaultSpinner.Start("Fetching gateway " + args[0] + "...")
+		spinner := startSpinner("Fetching gateway " + args[0] + "...")
 
 		c := client.New(simulatorURL)
 		gw, err := c.GetGateway(args[0])
@@ -107,7 +107,7 @@ var gatewaysCreateCmd = &cobra.Command{
 		req.FirmwareVersion, _ = cmd.Flags().GetString("firmware")
 		req.SendFrequencyMs, _ = cmd.Flags().GetInt("freq")
 
-		spinner, _ := pterm.DefaultSpinner.Start("Creating gateway...")
+		spinner := startSpinner("Creating gateway...")
 		c := client.New(simulatorURL)
 		gw, err := c.CreateGateway(req)
 		if err != nil {
@@ -134,7 +134,7 @@ var gatewaysBulkCmd = &cobra.Command{
 		req.FirmwareVersion, _ = cmd.Flags().GetString("firmware")
 		req.SendFrequencyMs, _ = cmd.Flags().GetInt("freq")
 
-		spinner, _ := pterm.DefaultSpinner.Start(
+		spinner := startSpinner(
 			fmt.Sprintf("Creating %d gateway(s)...", req.Count),
 		)
 		c := client.New(simulatorURL)
@@ -174,7 +174,7 @@ var gatewaysStartCmd = &cobra.Command{
 	Short: "Start telemetry emission for a gateway",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		spinner, _ := pterm.DefaultSpinner.Start("Starting gateway " + args[0] + "...")
+		spinner := startSpinner("Starting gateway " + args[0] + "...")
 		if err := client.New(simulatorURL).StartGateway(args[0]); err != nil {
 			spinner.Fail("Failed to start gateway")
 			return err
@@ -191,7 +191,7 @@ var gatewaysStopCmd = &cobra.Command{
 	Short: "Stop telemetry emission for a gateway",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		spinner, _ := pterm.DefaultSpinner.Start("Stopping gateway " + args[0] + "...")
+		spinner := startSpinner("Stopping gateway " + args[0] + "...")
 		if err := client.New(simulatorURL).StopGateway(args[0]); err != nil {
 			spinner.Fail("Failed to stop gateway")
 			return err
@@ -208,7 +208,7 @@ var gatewaysDeleteCmd = &cobra.Command{
 	Short: "Delete a gateway by UUID",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		spinner, _ := pterm.DefaultSpinner.Start("Deleting gateway " + args[0] + "...")
+		spinner := startSpinner("Deleting gateway " + args[0] + "...")
 		if err := client.New(simulatorURL).DeleteGateway(args[0]); err != nil {
 			spinner.Fail("Failed to delete gateway")
 			return err

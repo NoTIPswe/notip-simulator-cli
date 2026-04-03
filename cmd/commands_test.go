@@ -14,8 +14,14 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// TestMain disables all PTerm styling so ANSI codes don't pollute test output.
+// TestMain disables styled/color output before any test runs.
+//
+// Command code uses startSpinner(), which returns a no-op spinner when
+// pterm.RawOutput is enabled (set by DisableStyling). This avoids creating
+// PTerm spinner goroutines in tests and prevents the known -race issue in
+// pterm v0.12.79.
 func TestMain(m *testing.M) {
+	pterm.DisableOutput()
 	pterm.DisableStyling()
 	pterm.DisableColor()
 	os.Exit(m.Run())

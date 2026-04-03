@@ -33,7 +33,7 @@ var sensorsAddCmd = &cobra.Command{
 		req.MaxRange, _ = cmd.Flags().GetFloat64("max")
 		req.Algorithm, _ = cmd.Flags().GetString("algorithm")
 
-		spinner, _ := pterm.DefaultSpinner.Start(
+		spinner := startSpinner(
 			fmt.Sprintf("Adding %s sensor to gateway %d...", req.Type, gatewayID),
 		)
 		sensor, err := client.New(simulatorURL).AddSensor(gatewayID, req)
@@ -59,7 +59,7 @@ var sensorsListCmd = &cobra.Command{
 			return fmt.Errorf("gateway-id must be a numeric ID: %w", err)
 		}
 
-		spinner, _ := pterm.DefaultSpinner.Start(
+		spinner := startSpinner(
 			fmt.Sprintf("Fetching sensors for gateway %d...", gatewayID),
 		)
 		sensors, err := client.New(simulatorURL).ListSensors(gatewayID)
@@ -90,7 +90,7 @@ var sensorsDeleteCmd = &cobra.Command{
 			return fmt.Errorf("sensor-id must be a numeric ID: %w", err)
 		}
 
-		spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("Deleting sensor %d...", sensorID))
+		spinner := startSpinner(fmt.Sprintf("Deleting sensor %d...", sensorID))
 		if err := client.New(simulatorURL).DeleteSensor(sensorID); err != nil {
 			spinner.Fail("Failed to delete sensor")
 			return err

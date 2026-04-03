@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/NoTIPswe/notip-simulator-cli/internal/client"
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +23,7 @@ var anomaliesDisconnectCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		duration, _ := cmd.Flags().GetInt("duration")
 
-		spinner, _ := pterm.DefaultSpinner.Start(
+		spinner := startSpinner(
 			fmt.Sprintf("Triggering disconnect anomaly on gateway %s (%ds)...", args[0], duration),
 		)
 		if err := client.New(simulatorURL).Disconnect(args[0], duration); err != nil {
@@ -46,7 +45,7 @@ var anomaliesNetworkDegradationCmd = &cobra.Command{
 		duration, _ := cmd.Flags().GetInt("duration")
 		loss, _ := cmd.Flags().GetFloat64("packet-loss")
 
-		spinner, _ := pterm.DefaultSpinner.Start(
+		spinner := startSpinner(
 			fmt.Sprintf("Triggering network-degradation on gateway %s (%ds, %.0f%% loss)...",
 				args[0], duration, loss*100),
 		)
@@ -77,7 +76,7 @@ var anomaliesOutlierCmd = &cobra.Command{
 			valuePtr = &v
 		}
 
-		spinner, _ := pterm.DefaultSpinner.Start(
+		spinner := startSpinner(
 			fmt.Sprintf("Injecting outlier into sensor %d...", sensorID),
 		)
 		if err := client.New(simulatorURL).InjectOutlier(sensorID, valuePtr); err != nil {
