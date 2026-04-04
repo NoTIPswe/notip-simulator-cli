@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -23,11 +22,10 @@ const (
 // ── Domain types ─────────────────────────────────────────────────────────────
 
 // Gateway mirrors the GatewayResponse DTO returned by the backend.
-// The numeric ID is used for sensor operations; the UUID (ManagementGatewayID)
-// is used for gateway lifecycle and anomaly operations.
+// ID is the public gateway identifier (UUID in current API).
 type Gateway struct {
-	ID                  int64  `json:"id"`
-	ManagementGatewayID string `json:"managementGatewayId"`
+	ID                  string `json:"id"`
+	ManagementGatewayID string `json:"managementGatewayId,omitempty"`
 	FactoryID           string `json:"factoryId"`
 	Model               string `json:"model"`
 	FirmwareVersion     string `json:"firmwareVersion"`
@@ -40,9 +38,8 @@ type Gateway struct {
 
 // Sensor mirrors the SensorResponse DTO returned by the backend.
 type Sensor struct {
-	ID        int64   `json:"id"`
-	GatewayID int64   `json:"gatewayId"`
-	SensorID  string  `json:"sensorId"`
+	ID        string  `json:"id"`
+	GatewayID string  `json:"gatewayId"`
 	Type      string  `json:"type"`
 	MinRange  float64 `json:"minRange"`
 	MaxRange  float64 `json:"maxRange"`
@@ -240,9 +237,9 @@ func (c *Client) DeleteGateway(id string) error {
 // ── Sensor endpoints ──────────────────────────────────────────────────────────
 
 // AddSensor calls POST /sim/gateways/{id}/sensors.
-// gatewayID is the numeric int64 ID (not the UUID).
-func (c *Client) AddSensor(gatewayID int64, req AddSensorRequest) (*Sensor, error) {
-	path := pathGateways + strconv.FormatInt(gatewayID, 10) + "/sensors"
+// gatewayID is the public gateway identifier (UUID in current API).
+func (c *Client) AddSensor(gatewayID string, req AddSensorRequest) (*Sensor, error) {
+	path := pathGateways + gatewayID + "/sensors"
 	resp, err := c.post(path, req)
 	if err != nil {
 		return nil, err
@@ -256,9 +253,9 @@ func (c *Client) AddSensor(gatewayID int64, req AddSensorRequest) (*Sensor, erro
 }
 
 // ListSensors calls GET /sim/gateways/{id}/sensors.
-// gatewayID is the numeric int64 ID.
-func (c *Client) ListSensors(gatewayID int64) ([]Sensor, error) {
-	url := c.baseURL + pathGateways + strconv.FormatInt(gatewayID, 10) + "/sensors"
+// gatewayID is the public gateway identifier (UUID in current API).
+func (c *Client) ListSensors(gatewayID string) ([]Sensor, error) {
+	url := c.baseURL + pathGateways + gatewayID + "/sensors"
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf(errBuildRequest, err)
@@ -276,9 +273,9 @@ func (c *Client) ListSensors(gatewayID int64) ([]Sensor, error) {
 }
 
 // DeleteSensor calls DELETE /sim/sensors/{sensorId}.
-// sensorID is the numeric int64 ID.
-func (c *Client) DeleteSensor(sensorID int64) error {
-	req, err := http.NewRequestWithContext(c.ctx, http.MethodDelete, c.baseURL+pathSensors+strconv.FormatInt(sensorID, 10), nil)
+// sensorID is the public sensor identifier (UUID in current API).
+func (c *Client) DeleteSensor(sensorID string) error {
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodDelete, c.baseURL+pathSensors+sensorID, nil)
 	if err != nil {
 		return fmt.Errorf(errBuildRequest, err)
 	}
@@ -320,10 +317,11 @@ func (c *Client) Disconnect(gatewayID string, durationSeconds int) error {
 }
 
 // InjectOutlier calls POST /sim/sensors/{sensorId}/anomaly/outlier.
-// sensorID is the numeric int64 ID. value is optional (pass nil to omit).
-func (c *Client) InjectOutlier(sensorID int64, value *float64) error {
+// sensorID is the public sensor identifier (UUID in current API).
+// value is optional (pass nil to omit).
+func (c *Client) InjectOutlier(sensorID string, value *float64) error {
 	req := OutlierRequest{Value: value}
-	resp, err := c.post(pathSensors+strconv.FormatInt(sensorID, 10)+"/anomaly/outlier", req)
+	resp, err := c.post(pathSensors+sensorID+"/anomaly/outlier", req)
 	if err != nil {
 		return err
 	}
