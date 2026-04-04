@@ -35,7 +35,7 @@ var anomaliesDisconnectCmd = &cobra.Command{
 		spinner := startSpinner(
 			fmt.Sprintf("Triggering disconnect anomaly on gateway %s (%ds)...", args[0], duration),
 		)
-		if err := client.New(simulatorURL).Disconnect(args[0], duration); err != nil {
+		if err := client.New(simulatorURL).WithContext(cmd.Context()).Disconnect(args[0], duration); err != nil {
 			spinner.Fail("Failed to trigger disconnect")
 			return err
 		}
@@ -58,7 +58,7 @@ var anomaliesNetworkDegradationCmd = &cobra.Command{
 			fmt.Sprintf("Triggering network-degradation on gateway %s (%ds, %.0f%% loss)...",
 				args[0], duration, loss*100),
 		)
-		if err := client.New(simulatorURL).InjectNetworkDegradation(args[0], duration, loss); err != nil {
+		if err := client.New(simulatorURL).WithContext(cmd.Context()).InjectNetworkDegradation(args[0], duration, loss); err != nil {
 			spinner.Fail("Failed to trigger network degradation")
 			return err
 		}
@@ -88,7 +88,7 @@ var anomaliesOutlierCmd = &cobra.Command{
 		spinner := startSpinner(
 			fmt.Sprintf("Injecting outlier into sensor %d...", sensorID),
 		)
-		if err := client.New(simulatorURL).InjectOutlier(sensorID, valuePtr); err != nil {
+		if err := client.New(simulatorURL).WithContext(cmd.Context()).InjectOutlier(sensorID, valuePtr); err != nil {
 			spinner.Fail("Failed to inject outlier")
 			return err
 		}

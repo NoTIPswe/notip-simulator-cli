@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/NoTIPswe/notip-simulator-cli/internal/client"
@@ -15,16 +14,29 @@ var sensorsCmd = &cobra.Command{
 	Short: "Manage sensors attached to gateways",
 }
 
+func resolveGatewayID(c *client.Client, input string) (int64, error) {
+	if gatewayID, err := strconv.ParseInt(input, 10, 64); err == nil {
+		return gatewayID, nil
+	}
+
+	gw, err := c.GetGateway(input)
+	if err != nil {
+		return 0, fmt.Errorf("gateway must be a numeric ID or a valid gateway UUID: %w", err)
+	}
+	return gw.ID, nil
+}
+
 // ── add ───────────────────────────────────────────────────────────────────────
 
 var sensorsAddCmd = &cobra.Command{
-	Use:   "add <gateway-int-id>",
-	Short: "Add a sensor to a gateway (uses the numeric gateway ID, not the UUID)",
+	Use:   "add <gateway-id-or-uuid>",
+	Short: "Add a sensor to a gateway (accepts numeric ID or UUID)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		gatewayID, err := strconv.ParseInt(args[0], 10, 64)
+		c := client.New(simulatorURL).WithContext(cmd.Context())
+		gatewayID, err := resolveGatewayID(c, args[0])
 		if err != nil {
-			return fmt.Errorf("gateway-id must be a numeric ID: %w", err)
+			return err
 		}
 
 		req := client.AddSensorRequest{}
@@ -36,7 +48,7 @@ var sensorsAddCmd = &cobra.Command{
 		spinner := startSpinner(
 			fmt.Sprintf("Adding %s sensor to gateway %d...", req.Type, gatewayID),
 		)
-		sensor, err := client.New(simulatorURL).AddSensor(gatewayID, req)
+		sensor, err := c.AddSensor(gatewayID, req)
 		if err != nil {
 			spinner.Fail("Failed to add sensor")
 			return err
@@ -50,19 +62,20 @@ var sensorsAddCmd = &cobra.Command{
 // ── list ──────────────────────────────────────────────────────────────────────
 
 var sensorsListCmd = &cobra.Command{
-	Use:   "list <gateway-int-id>",
-	Short: "List all sensors for a gateway (uses the numeric gateway ID, not the UUID)",
+	Use:   "list <gateway-id-or-uuid>",
+	Short: "List sensors for a gateway (accepts numeric ID or UUID)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		gatewayID, err := strconv.ParseInt(args[0], 10, 64)
+		c := client.New(simulatorURL).WithContext(cmd.Context())
+		gatewayID, err := resolveGatewayID(c, args[0])
 		if err != nil {
-			return fmt.Errorf("gateway-id must be a numeric ID: %w", err)
+			return err
 		}
 
 		spinner := startSpinner(
 			fmt.Sprintf("Fetching sensors for gateway %d...", gatewayID),
 		)
-		sensors, err := client.New(simulatorURL).ListSensors(gatewayID)
+		sensors, err := c.ListSensors(gatewayID)
 		if err != nil {
 			spinner.Fail("Failed to fetch sensors")
 			return err
@@ -91,7 +104,7 @@ var sensorsDeleteCmd = &cobra.Command{
 		}
 
 		spinner := startSpinner(fmt.Sprintf("Deleting sensor %d...", sensorID))
-		if err := client.New(simulatorURL).DeleteSensor(sensorID); err != nil {
+		if err := client.New(simulatorURL).WithContext(cmd.Context()).DeleteSensor(sensorID); err != nil {
 			spinner.Fail("Failed to delete sensor")
 			return err
 		}
@@ -131,9 +144,6 @@ func init() {
 	sensorsAddCmd.Flags().Float64("max", 100, "Maximum range value (required)")
 	sensorsAddCmd.Flags().String("algorithm", "", "Generation algorithm: uniform_random|sine_wave|spike|constant (required)")
 	for _, f := range []string{"type", "min", "max", "algorithm"} {
-		if err := sensorsAddCmd.MarkFlagRequired(f); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		mustMarkRequired(sensorsAddCmd, f)
 	}
 }

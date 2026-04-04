@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 // ── Internal constants ────────────────────────────────────────────────────────
@@ -113,14 +114,29 @@ type OutlierRequest struct {
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+	ctx        context.Context
 }
+
+// defaultTimeout is the maximum time allowed for a single HTTP request.
+const defaultTimeout = 30 * time.Second
 
 // New creates a new Client targeting the given baseURL.
 func New(baseURL string) *Client {
 	return &Client{
 		baseURL:    baseURL,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: defaultTimeout},
+		ctx:        context.Background(),
 	}
+}
+
+// WithContext returns a shallow copy of the client bound to ctx.
+func (c *Client) WithContext(ctx context.Context) *Client {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cc := *c
+	cc.ctx = ctx
+	return &cc
 }
 
 // ── Gateway endpoints ─────────────────────────────────────────────────────────
@@ -155,7 +171,7 @@ func (c *Client) BulkCreateGateways(req BulkCreateGatewaysRequest) (*BulkCreateR
 
 // ListGateways calls GET /sim/gateways.
 func (c *Client) ListGateways() ([]Gateway, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.baseURL+pathGateways[:len(pathGateways)-1], nil)
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, c.baseURL+pathGateways[:len(pathGateways)-1], nil)
 	if err != nil {
 		return nil, fmt.Errorf(errBuildRequest, err)
 	}
@@ -173,7 +189,7 @@ func (c *Client) ListGateways() ([]Gateway, error) {
 
 // GetGateway calls GET /sim/gateways/{id} (UUID).
 func (c *Client) GetGateway(id string) (*Gateway, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.baseURL+pathGateways+id, nil)
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, c.baseURL+pathGateways+id, nil)
 	if err != nil {
 		return nil, fmt.Errorf(errBuildRequest, err)
 	}
@@ -211,7 +227,7 @@ func (c *Client) StopGateway(id string) error {
 
 // DeleteGateway calls DELETE /sim/gateways/{id} (UUID).
 func (c *Client) DeleteGateway(id string) error {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, c.baseURL+pathGateways+id, nil)
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodDelete, c.baseURL+pathGateways+id, nil)
 	if err != nil {
 		return fmt.Errorf(errBuildRequest, err)
 	}
@@ -245,7 +261,7 @@ func (c *Client) AddSensor(gatewayID int64, req AddSensorRequest) (*Sensor, erro
 // gatewayID is the numeric int64 ID.
 func (c *Client) ListSensors(gatewayID int64) ([]Sensor, error) {
 	url := c.baseURL + pathGateways + strconv.FormatInt(gatewayID, 10) + "/sensors"
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf(errBuildRequest, err)
 	}
@@ -264,7 +280,7 @@ func (c *Client) ListSensors(gatewayID int64) ([]Sensor, error) {
 // DeleteSensor calls DELETE /sim/sensors/{sensorId}.
 // sensorID is the numeric int64 ID.
 func (c *Client) DeleteSensor(sensorID int64) error {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, c.baseURL+pathSensors+strconv.FormatInt(sensorID, 10), nil)
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodDelete, c.baseURL+pathSensors+strconv.FormatInt(sensorID, 10), nil)
 	if err != nil {
 		return fmt.Errorf(errBuildRequest, err)
 	}
@@ -328,7 +344,7 @@ func (c *Client) post(path string, body any) (*http.Response, error) {
 		}
 		r = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, c.baseURL+path, r)
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodPost, c.baseURL+path, r)
 	if err != nil {
 		return nil, fmt.Errorf(errBuildRequest, err)
 	}

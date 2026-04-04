@@ -32,16 +32,21 @@ func TestMain(m *testing.M) {
 
 const (
 	testGatewayUUID      = "uuid-1"
+	testSensorUUID       = "s-uuid-1"
 	cmdNetDegradation    = "network-degradation"
 	fmtUnexpectedPath    = "unexpected path: %s"
 	fmtUnexpectedRequest = "unexpected request: %s %s"
 	testFlagFactoryID    = "--factory-id"
 	testFlagFactoryKey   = "--factory-key"
 	testFlagDuration     = "--duration"
+	testFlagType         = "--type"
+	testFlagAlgorithm    = "--algorithm"
 	bodyNotFound         = "not found"
 	errExpected404       = "expected error on 404"
 	fmtPipeErr           = "pipe: %v"
 	fmtWriteErr          = "write: %v"
+	pathGatewayUUID      = "/sim/gateways/" + testGatewayUUID
+	pathGatewaySensors   = "/sim/gateways/5/sensors"
 )
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -169,14 +174,16 @@ func TestGatewaysDeleteNoArgs(t *testing.T) {
 	}
 }
 
-func TestSensorsAddNonNumericID(t *testing.T) {
+func TestSensorsAddInvalidGatewayIdentifier(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		// Should never reach the server — arg parsing fails first.
-		t.Error("server should not have been called")
+		if r.URL.Path != "/sim/gateways/not-a-number" {
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
+		http.Error(w, bodyNotFound, http.StatusNotFound)
 	})
 	if err := runCmd("sensors", "add", "not-a-number",
-		"--type", "temperature", "--min", "0", "--max", "100", "--algorithm", "constant"); err == nil {
-		t.Error("expected error for non-numeric gateway ID")
+		testFlagType, "temperature", "--min", "0", "--max", "100", testFlagAlgorithm, "constant"); err == nil {
+		t.Error("expected error for invalid gateway identifier")
 	}
 }
 
@@ -245,7 +252,7 @@ func TestGatewaysStopIntegration(t *testing.T) {
 
 func TestGatewaysDeleteIntegration(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete || r.URL.Path != "/sim/gateways/uuid-1" {
+		if r.Method != http.MethodDelete || r.URL.Path != pathGatewayUUID {
 			t.Errorf(fmtUnexpectedRequest, r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -257,16 +264,54 @@ func TestGatewaysDeleteIntegration(t *testing.T) {
 
 func TestSensorsListIntegration(t *testing.T) {
 	sensors := []map[string]any{
-		{"id": 1, "gatewayId": 5, "sensorId": "s-uuid-1", "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "sine_wave"},
+		{"id": 1, "gatewayId": 5, "sensorId": testSensorUUID, "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "sine_wave"},
 	}
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/sim/gateways/5/sensors" {
+		if r.URL.Path != pathGatewaySensors {
 			t.Errorf(fmtUnexpectedPath, r.URL.Path)
 		}
 		writeJSON(w, http.StatusOK, sensors)
 	})
 	if err := runCmd("sensors", "list", "5"); err != nil {
 		t.Fatalf("sensors list failed: %v", err)
+	}
+}
+
+func TestSensorsListUUIDIntegration(t *testing.T) {
+	sensors := []map[string]any{
+		{"id": 1, "gatewayId": 5, "sensorId": "s-uuid-1", "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "sine_wave"},
+	}
+	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case pathGatewayUUID:
+			writeJSON(w, http.StatusOK, map[string]any{"id": 5, "managementGatewayId": testGatewayUUID})
+		case pathGatewaySensors:
+			writeJSON(w, http.StatusOK, sensors)
+		default:
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
+	})
+	if err := runCmd("sensors", "list", testGatewayUUID); err != nil {
+		t.Fatalf("sensors list by uuid failed: %v", err)
+	}
+}
+
+func TestSensorsAddUUIDIntegration(t *testing.T) {
+	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case pathGatewayUUID:
+			writeJSON(w, http.StatusOK, map[string]any{"id": 5, "managementGatewayId": testGatewayUUID})
+		case pathGatewaySensors:
+			writeJSON(w, http.StatusCreated, map[string]any{
+				"id": 1, "gatewayId": 5, "sensorId": testSensorUUID, "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "constant",
+			})
+		default:
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
+	})
+	if err := runCmd("sensors", "add", testGatewayUUID,
+		testFlagType, "temperature", "--min", "0", "--max", "100", testFlagAlgorithm, "constant"); err != nil {
+		t.Fatalf("sensors add by uuid failed: %v", err)
 	}
 }
 

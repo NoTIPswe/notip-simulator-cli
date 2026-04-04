@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/NoTIPswe/notip-simulator-cli/internal/client"
@@ -28,7 +27,7 @@ var gatewaysListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spinner := startSpinner("Fetching gateways...")
 
-		c := client.New(simulatorURL)
+		c := client.New(simulatorURL).WithContext(cmd.Context())
 		gateways, err := c.ListGateways()
 		if err != nil {
 			spinner.Fail("Failed to fetch gateways")
@@ -68,7 +67,7 @@ var gatewaysGetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spinner := startSpinner("Fetching gateway " + args[0] + "...")
 
-		c := client.New(simulatorURL)
+		c := client.New(simulatorURL).WithContext(cmd.Context())
 		gw, err := c.GetGateway(args[0])
 		if err != nil {
 			spinner.Fail("Failed to fetch gateway")
@@ -108,7 +107,7 @@ var gatewaysCreateCmd = &cobra.Command{
 		req.SendFrequencyMs, _ = cmd.Flags().GetInt("freq")
 
 		spinner := startSpinner("Creating gateway...")
-		c := client.New(simulatorURL)
+		c := client.New(simulatorURL).WithContext(cmd.Context())
 		gw, err := c.CreateGateway(req)
 		if err != nil {
 			spinner.Fail("Failed to create gateway")
@@ -137,7 +136,7 @@ var gatewaysBulkCmd = &cobra.Command{
 		spinner := startSpinner(
 			fmt.Sprintf("Creating %d gateway(s)...", req.Count),
 		)
-		c := client.New(simulatorURL)
+		c := client.New(simulatorURL).WithContext(cmd.Context())
 		result, err := c.BulkCreateGateways(req)
 		if err != nil {
 			spinner.Fail("Failed to create gateways")
@@ -175,7 +174,7 @@ var gatewaysStartCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spinner := startSpinner("Starting gateway " + args[0] + "...")
-		if err := client.New(simulatorURL).StartGateway(args[0]); err != nil {
+		if err := client.New(simulatorURL).WithContext(cmd.Context()).StartGateway(args[0]); err != nil {
 			spinner.Fail("Failed to start gateway")
 			return err
 		}
@@ -192,7 +191,7 @@ var gatewaysStopCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spinner := startSpinner("Stopping gateway " + args[0] + "...")
-		if err := client.New(simulatorURL).StopGateway(args[0]); err != nil {
+		if err := client.New(simulatorURL).WithContext(cmd.Context()).StopGateway(args[0]); err != nil {
 			spinner.Fail("Failed to stop gateway")
 			return err
 		}
@@ -209,7 +208,7 @@ var gatewaysDeleteCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spinner := startSpinner("Deleting gateway " + args[0] + "...")
-		if err := client.New(simulatorURL).DeleteGateway(args[0]); err != nil {
+		if err := client.New(simulatorURL).WithContext(cmd.Context()).DeleteGateway(args[0]); err != nil {
 			spinner.Fail("Failed to delete gateway")
 			return err
 		}
@@ -272,10 +271,7 @@ func init() {
 	gatewaysCreateCmd.Flags().String("firmware", "", "Firmware version")
 	gatewaysCreateCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds")
 	for _, f := range []string{flagFactoryID, flagFactoryKey, "serial"} {
-		if err := gatewaysCreateCmd.MarkFlagRequired(f); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		mustMarkRequired(gatewaysCreateCmd, f)
 	}
 
 	// bulk flags
@@ -286,9 +282,6 @@ func init() {
 	gatewaysBulkCmd.Flags().String("firmware", "", "Firmware version")
 	gatewaysBulkCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds")
 	for _, f := range []string{"count", flagFactoryID, flagFactoryKey} {
-		if err := gatewaysBulkCmd.MarkFlagRequired(f); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		mustMarkRequired(gatewaysBulkCmd, f)
 	}
 }

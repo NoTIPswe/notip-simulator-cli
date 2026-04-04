@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o sim-cli .
 FROM ghcr.io/notipswe/notip-go-base:v0.0.1 AS prod
 
 LABEL org.opencontainers.image.source="https://github.com/NoTIPswe/notip-simulator-cli" \
-  org.opencontainers.image.description="NoTIP Simulator CLI" \
+      org.opencontainers.image.description="NoTIP Simulator CLI" \
       org.opencontainers.image.licenses="MIT"
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser \

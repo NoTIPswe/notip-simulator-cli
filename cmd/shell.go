@@ -54,6 +54,7 @@ restarting the container. Type 'help' for available commands, 'exit' to quit.`,
 				continue
 			}
 
+			resetAllCommandFlags(rootCmd)
 			rootCmd.SetArgs(parts)
 			if execErr := rootCmd.Execute(); execErr != nil {
 				pterm.Error.Println(execErr)
@@ -85,7 +86,7 @@ func printWelcomeBanner() {
 		Println("Type a command to execute it.\n" +
 			pterm.Gray("  gateways list\n") +
 			pterm.Gray("  gateways get <uuid>\n") +
-			pterm.Gray("  sensors list <id>\n") +
+			pterm.Gray("  sensors list <gateway-id-or-uuid>\n") +
 			pterm.Gray("  anomalies disconnect <uuid> --duration 5\n") +
 			"\nType " + pterm.Bold.Sprint("exit") + " or press Ctrl+D to quit.")
 }
