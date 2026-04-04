@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/NoTIPswe/notip-simulator-cli/compare/v1.0.0...v1.1.0) (2026-04-04)
+
+
+### Bug Fixes
+
+* refactor tests for improved readability and consistency ([6d03a39](https://github.com/NoTIPswe/notip-simulator-cli/commit/6d03a39db9464e86ca44ae77814364632a983ec6))
+
+
+### Features
+
+* enhance client context management and improve command handling ([157c8dd](https://github.com/NoTIPswe/notip-simulator-cli/commit/157c8dd63d9eeb2fdd4639b18477e1fe30b3bd47))
+
 # 1.0.0 (2026-04-03)
 
 
