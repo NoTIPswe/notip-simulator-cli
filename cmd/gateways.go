@@ -99,7 +99,6 @@ var gatewaysCreateCmd = &cobra.Command{
 		req := client.CreateGatewayRequest{}
 		req.FactoryID, _ = cmd.Flags().GetString(flagFactoryID)
 		req.FactoryKey, _ = cmd.Flags().GetString(flagFactoryKey)
-		req.SerialNumber, _ = cmd.Flags().GetString("serial")
 		req.Model, _ = cmd.Flags().GetString("model")
 		req.FirmwareVersion, _ = cmd.Flags().GetString("firmware")
 		req.SendFrequencyMs, _ = cmd.Flags().GetInt("freq")
@@ -263,11 +262,10 @@ func init() {
 	// create flags
 	gatewaysCreateCmd.Flags().String(flagFactoryID, "", "Factory ID (required)")
 	gatewaysCreateCmd.Flags().String(flagFactoryKey, "", "Factory key (required)")
-	gatewaysCreateCmd.Flags().String("serial", "", "Serial number (required)")
 	gatewaysCreateCmd.Flags().String("model", "", "Gateway model (required)")
 	gatewaysCreateCmd.Flags().String("firmware", "", "Firmware version (required)")
 	gatewaysCreateCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds (required)")
-	for _, f := range []string{flagFactoryID, flagFactoryKey, "serial", "model", "firmware", "freq"} {
+	for _, f := range []string{flagFactoryID, flagFactoryKey, "model", "firmware", "freq"} {
 		mustMarkRequired(gatewaysCreateCmd, f)
 	}
 

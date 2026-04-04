@@ -70,16 +70,15 @@ func TestCreateGatewaySuccess(t *testing.T) {
 
 		var req client.CreateGatewayRequest
 		decodeBody(t, r, &req)
-		if req.FactoryID != "fac-1" || req.SerialNumber != "SN-001" {
+		if req.FactoryID != "fac-1" {
 			t.Errorf("unexpected request body: %+v", req)
 		}
 		writeJSON(w, http.StatusCreated, want)
 	})
 
 	got, err := c.CreateGateway(client.CreateGatewayRequest{
-		FactoryID:    "fac-1",
-		FactoryKey:   "key-1",
-		SerialNumber: "SN-001",
+		FactoryID:  "fac-1",
+		FactoryKey: "key-1",
 	})
 	if err != nil {
 		t.Fatalf(errFmtUnexpected, err)
@@ -467,9 +466,8 @@ func TestCreateGatewayInvalidJSONResponse(t *testing.T) {
 	})
 
 	_, err := c.CreateGateway(client.CreateGatewayRequest{
-		FactoryID:    "f-1",
-		FactoryKey:   "k-1",
-		SerialNumber: "SN-1",
+		FactoryID:  "f-1",
+		FactoryKey: "k-1",
 	})
 	if err == nil {
 		t.Fatal(errExpectedDecode)

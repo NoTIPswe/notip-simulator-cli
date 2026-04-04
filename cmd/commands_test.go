@@ -212,7 +212,7 @@ func TestAnomaliesOutlierNonNumericID(t *testing.T) {
 
 func TestGatewaysListIntegration(t *testing.T) {
 	gateways := []map[string]any{
-		{"id": 1, "managementGatewayId": testGatewayUUID, "status": "online", "model": "X", "serialNumber": "SN1", "sendFrequencyMs": 1000, "tenantId": "t1"},
+		{"id": 1, "managementGatewayId": testGatewayUUID, "status": "online", "model": "X", "sendFrequencyMs": 1000, "tenantId": "t1"},
 	}
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.URL.Path != "/sim/gateways" {
@@ -417,7 +417,6 @@ func TestGatewaysCreateServerError(t *testing.T) {
 	err := runCmd("gateways", "create",
 		testFlagFactoryID, "f",
 		testFlagFactoryKey, "k",
-		"--serial", "SN",
 		testFlagModel, "GW-X",
 		testFlagFirmware, "1.0.0",
 		testFlagFreq, "1000",

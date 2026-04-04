@@ -29,7 +29,6 @@ type Gateway struct {
 	ID                  int64  `json:"id"`
 	ManagementGatewayID string `json:"managementGatewayId"`
 	FactoryID           string `json:"factoryId"`
-	SerialNumber        string `json:"serialNumber"`
 	Model               string `json:"model"`
 	FirmwareVersion     string `json:"firmwareVersion"`
 	Provisioned         bool   `json:"provisioned"`
@@ -57,7 +56,6 @@ type Sensor struct {
 type CreateGatewayRequest struct {
 	FactoryID       string `json:"factoryId"`
 	FactoryKey      string `json:"factoryKey"`
-	SerialNumber    string `json:"serialNumber"`
 	Model           string `json:"model,omitempty"`
 	FirmwareVersion string `json:"firmwareVersion,omitempty"`
 	SendFrequencyMs int    `json:"sendFrequencyMs,omitempty"`

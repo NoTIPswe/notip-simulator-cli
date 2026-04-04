@@ -13,7 +13,6 @@ import (
 
 const (
 	fmtUnexpectedError = "unexpected error: %v"
-	flagSerialArg      = "--serial"
 )
 
 // readBody parses the request body into a generic map for field inspection.
@@ -62,7 +61,6 @@ func TestGatewaysCreateFlagToJSONMapping(t *testing.T) {
 		body := readBody(t, r)
 		checkKey(t, body, "factoryId", "fac-42")
 		checkKey(t, body, "factoryKey", "secret-key")
-		checkKey(t, body, "serialNumber", "SN-XYZ")
 		checkKey(t, body, "model", "GW-PRO")
 		checkKey(t, body, "firmwareVersion", "3.0.1")
 		checkKey(t, body, "sendFrequencyMs", float64(250))
@@ -73,7 +71,6 @@ func TestGatewaysCreateFlagToJSONMapping(t *testing.T) {
 	err := runCmd("gateways", "create",
 		testFlagFactoryID, "fac-42",
 		testFlagFactoryKey, "secret-key",
-		flagSerialArg, "SN-XYZ",
 		testFlagModel, "GW-PRO",
 		testFlagFirmware, "3.0.1",
 		testFlagFreq, "250",
@@ -93,7 +90,6 @@ func TestGatewaysCreateFreqMapping(t *testing.T) {
 	err := runCmd("gateways", "create",
 		testFlagFactoryID, "f",
 		testFlagFactoryKey, "k",
-		flagSerialArg, "SN",
 		testFlagModel, "GW-X",
 		testFlagFirmware, "1.0.0",
 		testFlagFreq, "1000",
@@ -107,7 +103,6 @@ func TestGatewaysCreateMissingModelFails(t *testing.T) {
 	err := runCmd("gateways", "create",
 		testFlagFactoryID, "f",
 		testFlagFactoryKey, "k",
-		flagSerialArg, "SN",
 		testFlagFirmware, "1.0.0",
 		testFlagFreq, "1000",
 	)
@@ -162,7 +157,6 @@ func TestGatewaysGetIntegration(t *testing.T) {
 			"managementGatewayId": "uuid-get-1",
 			"status":              "online",
 			"model":               "GW-X",
-			"serialNumber":        "SN001",
 			"firmwareVersion":     "1.0",
 			"sendFrequencyMs":     1000,
 			"tenantId":            "t-1",

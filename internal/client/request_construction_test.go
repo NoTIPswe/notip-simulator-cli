@@ -85,7 +85,6 @@ func TestCreateGateway_RequestConstruction(t *testing.T) {
 		body := readBodyAsMap(t, r)
 		assertKey(t, body, "factoryId", "fac-1")
 		assertKey(t, body, "factoryKey", "key-secret")
-		assertKey(t, body, "serialNumber", "SN-001")
 		assertKey(t, body, "model", "GW-X200")
 		assertKey(t, body, "firmwareVersion", "2.1.0")
 		assertKey(t, body, "sendFrequencyMs", float64(500))
@@ -96,7 +95,6 @@ func TestCreateGateway_RequestConstruction(t *testing.T) {
 	_, err := c.CreateGateway(client.CreateGatewayRequest{
 		FactoryID:       "fac-1",
 		FactoryKey:      "key-secret",
-		SerialNumber:    "SN-001",
 		Model:           "GW-X200",
 		FirmwareVersion: "2.1.0",
 		SendFrequencyMs: 500,
@@ -117,9 +115,8 @@ func TestCreateGateway_OptionalFields_OmittedWhenZero(t *testing.T) {
 	})
 
 	_, _ = c.CreateGateway(client.CreateGatewayRequest{
-		FactoryID:    "f",
-		FactoryKey:   "k",
-		SerialNumber: "SN",
+		FactoryID:  "f",
+		FactoryKey: "k",
 	})
 }
 
