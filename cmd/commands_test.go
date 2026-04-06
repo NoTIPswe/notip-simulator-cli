@@ -32,8 +32,10 @@ func TestMain(m *testing.M) {
 
 const (
 	testGatewayUUID      = "uuid-1"
+	testGatewayPublicID  = "gw-public-1"
 	testSensorUUID       = "s-uuid-1"
 	cmdNetDegradation    = "network-degradation"
+	pathGatewaysPrefix   = "/sim/gateways/"
 	fmtUnexpectedPath    = "unexpected path: %s"
 	fmtUnexpectedRequest = "unexpected request: %s %s"
 	testFlagFactoryID    = "--factory-id"
@@ -48,8 +50,8 @@ const (
 	errExpected404       = "expected error on 404"
 	fmtPipeErr           = "pipe: %v"
 	fmtWriteErr          = "write: %v"
-	pathGatewayUUID      = "/sim/gateways/" + testGatewayUUID
-	pathGatewaySensors   = "/sim/gateways/5/sensors"
+	pathGatewayUUID      = pathGatewaysPrefix + testGatewayUUID
+	pathGatewaySensors   = pathGatewaysPrefix + testGatewayPublicID + "/sensors"
 )
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -196,15 +198,15 @@ func TestSensorsAddInvalidGatewayIdentifier(t *testing.T) {
 	}
 }
 
-func TestSensorsDeleteNonNumericID(t *testing.T) {
-	if err := runCmd("sensors", "delete", "abc"); err == nil {
-		t.Error("expected error for non-numeric sensor ID")
+func TestSensorsDeleteNoArgs(t *testing.T) {
+	if err := runCmd("sensors", "delete"); err == nil {
+		t.Error("expected error when sensor uuid arg is missing")
 	}
 }
 
-func TestAnomaliesOutlierNonNumericID(t *testing.T) {
-	if err := runCmd("anomalies", "outlier", "not-a-number"); err == nil {
-		t.Error("expected error for non-numeric sensor ID")
+func TestAnomaliesOutlierNoArgs(t *testing.T) {
+	if err := runCmd("anomalies", "outlier"); err == nil {
+		t.Error("expected error when sensor uuid arg is missing")
 	}
 }
 
@@ -212,7 +214,7 @@ func TestAnomaliesOutlierNonNumericID(t *testing.T) {
 
 func TestGatewaysListIntegration(t *testing.T) {
 	gateways := []map[string]any{
-		{"id": 1, "managementGatewayId": testGatewayUUID, "status": "online", "model": "X", "sendFrequencyMs": 1000, "tenantId": "t1"},
+		{"id": testGatewayPublicID, "managementGatewayId": testGatewayUUID, "status": "online", "model": "X", "sendFrequencyMs": 1000, "tenantId": "t1"},
 	}
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.URL.Path != "/sim/gateways" {
@@ -273,28 +275,33 @@ func TestGatewaysDeleteIntegration(t *testing.T) {
 
 func TestSensorsListIntegration(t *testing.T) {
 	sensors := []map[string]any{
-		{"id": 1, "gatewayId": 5, "sensorId": testSensorUUID, "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "sine_wave"},
+		{"id": testSensorUUID, "gatewayId": testGatewayPublicID, "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "sine_wave"},
 	}
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != pathGatewaySensors {
+		switch r.URL.Path {
+		case pathGatewayUUID:
+			writeJSON(w, http.StatusOK, map[string]any{"id": testGatewayPublicID, "managementGatewayId": testGatewayUUID})
+		case pathGatewaySensors:
+			writeJSON(w, http.StatusOK, sensors)
+		default:
 			t.Errorf(fmtUnexpectedPath, r.URL.Path)
 		}
-		writeJSON(w, http.StatusOK, sensors)
 	})
-	if err := runCmd("sensors", "list", "5"); err != nil {
+	if err := runCmd("sensors", "list", testGatewayUUID); err != nil {
 		t.Fatalf("sensors list failed: %v", err)
 	}
 }
 
 func TestSensorsListUUIDIntegration(t *testing.T) {
+	const publicID = "gw-public-uuid-test"
 	sensors := []map[string]any{
-		{"id": 1, "gatewayId": 5, "sensorId": "s-uuid-1", "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "sine_wave"},
+		{"id": "s-uuid-1", "gatewayId": publicID, "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "sine_wave"},
 	}
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case pathGatewayUUID:
-			writeJSON(w, http.StatusOK, map[string]any{"id": 5, "managementGatewayId": testGatewayUUID})
-		case pathGatewaySensors:
+			writeJSON(w, http.StatusOK, map[string]any{"id": publicID, "managementGatewayId": testGatewayUUID})
+		case "/sim/gateways/" + publicID + "/sensors":
 			writeJSON(w, http.StatusOK, sensors)
 		default:
 			t.Errorf(fmtUnexpectedPath, r.URL.Path)
@@ -309,10 +316,10 @@ func TestSensorsAddUUIDIntegration(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case pathGatewayUUID:
-			writeJSON(w, http.StatusOK, map[string]any{"id": 5, "managementGatewayId": testGatewayUUID})
+			writeJSON(w, http.StatusOK, map[string]any{"id": testGatewayPublicID, "managementGatewayId": testGatewayUUID})
 		case pathGatewaySensors:
 			writeJSON(w, http.StatusCreated, map[string]any{
-				"id": 1, "gatewayId": 5, "sensorId": testSensorUUID, "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "constant",
+				"id": testSensorUUID, "gatewayId": testGatewayPublicID, "type": "temperature", "minRange": 0, "maxRange": 100, "algorithm": "constant",
 			})
 		default:
 			t.Errorf(fmtUnexpectedPath, r.URL.Path)
@@ -326,12 +333,12 @@ func TestSensorsAddUUIDIntegration(t *testing.T) {
 
 func TestSensorsDeleteIntegration(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete || r.URL.Path != "/sim/sensors/99" {
+		if r.Method != http.MethodDelete || r.URL.Path != "/sim/sensors/"+testSensorUUID {
 			t.Errorf(fmtUnexpectedRequest, r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	if err := runCmd("sensors", "delete", "99"); err != nil {
+	if err := runCmd("sensors", "delete", testSensorUUID); err != nil {
 		t.Fatalf("sensors delete failed: %v", err)
 	}
 }
@@ -375,7 +382,7 @@ func TestAnomaliesNetworkDegradationIntegration(t *testing.T) {
 
 func TestAnomaliesOutlierIntegration(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/sim/sensors/42/anomaly/outlier" {
+		if r.URL.Path != "/sim/sensors/sensor-42/anomaly/outlier" {
 			t.Errorf(fmtUnexpectedPath, r.URL.Path)
 		}
 		var body map[string]any
@@ -385,7 +392,7 @@ func TestAnomaliesOutlierIntegration(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	if err := runCmd("anomalies", "outlier", "42", "--value", "999.9"); err != nil {
+	if err := runCmd("anomalies", "outlier", "sensor-42", "--value", "999.9"); err != nil {
 		t.Fatalf("anomalies outlier failed: %v", err)
 	}
 }
@@ -446,7 +453,7 @@ func TestGatewaysBulkServerError(t *testing.T) {
 func TestGatewaysBulkPartialErrors(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMultiStatus, map[string]any{
-			"gateways": []any{map[string]any{"id": 1}},
+			"gateways": []any{map[string]any{"id": "gw-1"}},
 			"errors":   []any{"", "factory key mismatch"},
 		})
 	})
@@ -494,7 +501,7 @@ func TestSensorsAddServerError(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, bodyNotFound, http.StatusNotFound)
 	})
-	err := runCmd("sensors", "add", "5", "--type", "temperature", "--min", "0", "--max", "100", "--algorithm", "constant")
+	err := runCmd("sensors", "add", testGatewayUUID, "--type", "temperature", "--min", "0", "--max", "100", "--algorithm", "constant")
 	if err == nil {
 		t.Error(errExpected404)
 	}
@@ -502,18 +509,32 @@ func TestSensorsAddServerError(t *testing.T) {
 
 func TestSensorsListEmptyResult(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, []any{})
+		switch r.URL.Path {
+		case pathGatewayUUID:
+			writeJSON(w, http.StatusOK, map[string]any{"id": testGatewayPublicID, "managementGatewayId": testGatewayUUID})
+		case pathGatewaySensors:
+			writeJSON(w, http.StatusOK, []any{})
+		default:
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
 	})
-	if err := runCmd("sensors", "list", "5"); err != nil {
+	if err := runCmd("sensors", "list", testGatewayUUID); err != nil {
 		t.Fatalf("sensors list empty failed: %v", err)
 	}
 }
 
 func TestSensorsListServerError(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, bodyNotFound, http.StatusNotFound)
+		switch r.URL.Path {
+		case pathGatewayUUID:
+			writeJSON(w, http.StatusOK, map[string]any{"id": testGatewayPublicID, "managementGatewayId": testGatewayUUID})
+		case pathGatewaySensors:
+			http.Error(w, bodyNotFound, http.StatusNotFound)
+		default:
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
 	})
-	if err := runCmd("sensors", "list", "5"); err == nil {
+	if err := runCmd("sensors", "list", testGatewayUUID); err == nil {
 		t.Error(errExpected404)
 	}
 }
@@ -522,7 +543,7 @@ func TestSensorsDeleteServerError(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, bodyNotFound, http.StatusNotFound)
 	})
-	if err := runCmd("sensors", "delete", "99"); err == nil {
+	if err := runCmd("sensors", "delete", testSensorUUID); err == nil {
 		t.Error(errExpected404)
 	}
 }
@@ -549,7 +570,7 @@ func TestAnomaliesOutlierServerError(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, bodyNotFound, http.StatusNotFound)
 	})
-	if err := runCmd("anomalies", "outlier", "42"); err == nil {
+	if err := runCmd("anomalies", "outlier", testSensorUUID); err == nil {
 		t.Error(errExpected404)
 	}
 }
