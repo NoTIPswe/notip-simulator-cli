@@ -76,7 +76,7 @@ type BulkCreateResponse struct {
 }
 
 // AddSensorRequest is the payload for POST /sim/gateways/{id}/sensors.
-// The gateway ID in the path is the numeric int64 ID, not the UUID.
+// The gateway ID in the path is the public gateway identifier (UUID string).
 type AddSensorRequest struct {
 	Type      string  `json:"type"`
 	MinRange  float64 `json:"minRange"`
