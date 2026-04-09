@@ -264,7 +264,7 @@ func TestShellDefaultHooksCoverage(t *testing.T) {
 	}
 
 	var rw bytes.Buffer
-	if editor := shellNewEditor(&rw, "sim-cli> "); editor == nil {
+	if shellNewEditor(&rw, "sim-cli> ") == nil {
 		t.Fatal("shellNewEditor should return a line editor")
 	}
 }

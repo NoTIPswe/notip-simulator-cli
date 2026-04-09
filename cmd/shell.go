@@ -71,7 +71,7 @@ restarting the container. Type 'help' for available commands, 'exit' to quit.`,
 				return nil
 			}
 
-			if shouldExit := processShellLine(line); shouldExit {
+			if processShellLine(line) {
 				return nil
 			}
 		}
