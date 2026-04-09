@@ -1,8 +1,10 @@
 package client_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -540,5 +542,61 @@ func TestListSensorsInvalidJSONResponse(t *testing.T) {
 	_, err := c.ListSensors("gw-1")
 	if err == nil {
 		t.Fatal(errExpectedDecode)
+	}
+}
+
+func TestWithContextNilFallback(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, []client.Gateway{})
+	})
+
+	cc := c.WithContext(nil) //nolint:staticcheck // Intentional nil input to validate WithContext fallback behavior.
+	if cc == c {
+		t.Fatal("WithContext should return a shallow copy")
+	}
+
+	if _, err := cc.ListGateways(); err != nil {
+		t.Fatalf(errFmtUnexpected, err)
+	}
+}
+
+func TestWithContextUsesProvidedContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("request should not be sent when context is already canceled")
+	})
+
+	err := c.WithContext(ctx).StartGateway("gw-1")
+	if err == nil {
+		t.Fatal("expected context cancellation error, got nil")
+	}
+}
+
+func TestAddSensorPayloadEncodeError(t *testing.T) {
+	c := client.New("http://example.invalid")
+	_, err := c.AddSensor("gw-1", client.AddSensorRequest{
+		Type:      "temperature",
+		MinRange:  math.NaN(),
+		MaxRange:  100,
+		Algorithm: "constant",
+	})
+	if err == nil {
+		t.Fatal("expected payload encode error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to encode payload") {
+		t.Fatalf(errFmtUnexpected, err)
+	}
+}
+
+func TestListGatewaysInvalidBaseURL(t *testing.T) {
+	c := client.New("://bad-url")
+	_, err := c.ListGateways()
+	if err == nil {
+		t.Fatal("expected build request error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to build request") {
+		t.Fatalf(errFmtUnexpected, err)
 	}
 }

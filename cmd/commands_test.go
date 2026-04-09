@@ -507,6 +507,29 @@ func TestSensorsAddServerError(t *testing.T) {
 	}
 }
 
+func TestSensorsAddFailsAfterGatewayLookup(t *testing.T) {
+	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case pathGatewayUUID:
+			writeJSON(w, http.StatusOK, map[string]any{"id": testGatewayPublicID, "managementGatewayId": testGatewayUUID})
+		case pathGatewaySensors:
+			http.Error(w, bodyNotFound, http.StatusNotFound)
+		default:
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
+	})
+
+	err := runCmd("sensors", "add", testGatewayUUID,
+		testFlagType, "temperature",
+		"--min", "0",
+		"--max", "100",
+		testFlagAlgorithm, "constant",
+	)
+	if err == nil {
+		t.Error(errExpected404)
+	}
+}
+
 func TestSensorsListEmptyResult(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -534,6 +557,16 @@ func TestSensorsListServerError(t *testing.T) {
 			t.Errorf(fmtUnexpectedPath, r.URL.Path)
 		}
 	})
+	if err := runCmd("sensors", "list", testGatewayUUID); err == nil {
+		t.Error(errExpected404)
+	}
+}
+
+func TestSensorsListGatewayLookupError(t *testing.T) {
+	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, bodyNotFound, http.StatusNotFound)
+	})
+
 	if err := runCmd("sensors", "list", testGatewayUUID); err == nil {
 		t.Error(errExpected404)
 	}
@@ -751,5 +784,44 @@ func TestPrintSensorTableEmptySliceNoOutput(t *testing.T) {
 
 	if out != "" {
 		t.Fatalf("expected no output for empty sensor table, got %q", out)
+	}
+}
+
+func TestPrintGatewayTableEmptySliceNoOutput(t *testing.T) {
+	out := captureStdout(t, func() {
+		printGatewayTable([]client.Gateway{})
+	})
+
+	if out != "" {
+		t.Fatalf("expected no output for empty gateway table, got %q", out)
+	}
+}
+
+func TestGatewayUUIDResolution(t *testing.T) {
+	if got := gatewayUUID(client.Gateway{ID: "gw-1", ManagementGatewayID: testGatewayUUID}); got != testGatewayUUID {
+		t.Fatalf("gatewayUUID with management id = %q, want %q", got, testGatewayUUID)
+	}
+	if got := gatewayUUID(client.Gateway{ID: "gw-2"}); got != "gw-2" {
+		t.Fatalf("gatewayUUID fallback = %q, want %q", got, "gw-2")
+	}
+}
+
+func TestAnomaliesOutlierNoValueIntegration(t *testing.T) {
+	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/sim/sensors/sensor-100/anomaly/outlier" {
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
+
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if _, ok := body["value"]; ok {
+			t.Errorf("value should be omitted when --value is not provided")
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := runCmd("anomalies", "outlier", "sensor-100"); err != nil {
+		t.Fatalf("anomalies outlier without value failed: %v", err)
 	}
 }

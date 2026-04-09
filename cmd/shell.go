@@ -14,6 +14,29 @@ import (
 	"golang.org/x/term"
 )
 
+type shellLineEditor interface {
+	ReadLine() (string, error)
+}
+
+const goodbyeMessage = "Goodbye!"
+
+var (
+	shellStdin      = func() *os.File { return os.Stdin }
+	shellStdout     = func() *os.File { return os.Stdout }
+	shellIsTerminal = term.IsTerminal
+	shellMakeRaw    = term.MakeRaw
+	shellRestore    = term.Restore
+	shellNewEditor  = func(rw io.ReadWriter, prompt string) shellLineEditor {
+		return term.NewTerminal(rw, prompt)
+	}
+	renderWelcomeBigText = func() error {
+		return pterm.DefaultBigText.WithLetters(
+			putils.LettersFromStringWithStyle("sim", pterm.NewStyle(pterm.FgGreen)),
+			putils.LettersFromStringWithStyle("-cli", pterm.NewStyle(pterm.FgGray)),
+		).Render()
+	}
+)
+
 var shellCmd = &cobra.Command{
 	Use:   "shell",
 	Short: "Start an interactive shell session",
@@ -28,14 +51,14 @@ restarting the container. Type 'help' for available commands, 'exit' to quit.`,
 		defer func() { rootCmd.SilenceUsage = false }()
 
 		if canUseLineEditor() {
-			err := runShellWithLineEditor()
-			if err == nil {
+			if err := runShellWithLineEditor(); err != nil {
+				pterm.Warning.Printf("line editor disabled: %v\n", err)
+			} else {
 				return nil
 			}
-			pterm.Warning.Printf("line editor disabled: %v\n", err)
 		}
 
-		reader := bufio.NewReader(os.Stdin)
+		reader := bufio.NewReader(shellStdin())
 		for {
 			printPrompt()
 
@@ -43,7 +66,7 @@ restarting the container. Type 'help' for available commands, 'exit' to quit.`,
 			if err != nil {
 				if err == io.EOF {
 					fmt.Println()
-					pterm.Info.Println("Goodbye!")
+					pterm.Info.Println(goodbyeMessage)
 				}
 				return nil
 			}
@@ -56,25 +79,28 @@ restarting the container. Type 'help' for available commands, 'exit' to quit.`,
 }
 
 func canUseLineEditor() bool {
-	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+	return shellIsTerminal(int(shellStdin().Fd())) && shellIsTerminal(int(shellStdout().Fd()))
 }
 
 func runShellWithLineEditor() error {
-	fd := int(os.Stdin.Fd())
-	oldState, err := term.MakeRaw(fd)
+	stdin := shellStdin()
+	stdout := shellStdout()
+
+	fd := int(stdin.Fd())
+	oldState, err := shellMakeRaw(fd)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = term.Restore(fd, oldState)
+		_ = shellRestore(fd, oldState)
 	}()
 
-	lineEditor := term.NewTerminal(struct {
+	lineEditor := shellNewEditor(struct {
 		io.Reader
 		io.Writer
 	}{
-		Reader: os.Stdin,
-		Writer: os.Stdout,
+		Reader: stdin,
+		Writer: stdout,
 	}, "sim-cli> ")
 
 	for {
@@ -82,18 +108,18 @@ func runShellWithLineEditor() error {
 		if readErr != nil {
 			if errors.Is(readErr, io.EOF) {
 				fmt.Println()
-				pterm.Info.Println("Goodbye!")
+				pterm.Info.Println(goodbyeMessage)
 				return nil
 			}
 			return readErr
 		}
 
 		// Leave raw mode while the command runs so output renders correctly.
-		if err := term.Restore(fd, oldState); err != nil {
+		if err := shellRestore(fd, oldState); err != nil {
 			return err
 		}
 		shouldExit := processShellLine(line)
-		if _, err := term.MakeRaw(fd); err != nil {
+		if _, err := shellMakeRaw(fd); err != nil {
 			return err
 		}
 		if shouldExit {
@@ -108,7 +134,7 @@ func processShellLine(line string) bool {
 		return false
 	}
 	if line == "exit" || line == "quit" {
-		pterm.Info.Println("Goodbye!")
+		pterm.Info.Println(goodbyeMessage)
 		return true
 	}
 
@@ -138,10 +164,7 @@ func printPrompt() {
 
 func printWelcomeBanner() {
 	if !pterm.RawOutput {
-		if err := pterm.DefaultBigText.WithLetters(
-			putils.LettersFromStringWithStyle("sim", pterm.NewStyle(pterm.FgGreen)),
-			putils.LettersFromStringWithStyle("-cli", pterm.NewStyle(pterm.FgGray)),
-		).Render(); err != nil {
+		if err := renderWelcomeBigText(); err != nil {
 			pterm.Warning.Printf("failed to render banner: %v\n", err)
 		}
 	}
