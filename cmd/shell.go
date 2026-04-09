@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,30 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
+)
+
+type shellLineEditor interface {
+	ReadLine() (string, error)
+}
+
+const goodbyeMessage = "Goodbye!"
+
+var (
+	shellStdin      = func() *os.File { return os.Stdin }
+	shellStdout     = func() *os.File { return os.Stdout }
+	shellIsTerminal = term.IsTerminal
+	shellMakeRaw    = term.MakeRaw
+	shellRestore    = term.Restore
+	shellNewEditor  = func(rw io.ReadWriter, prompt string) shellLineEditor {
+		return term.NewTerminal(rw, prompt)
+	}
+	renderWelcomeBigText = func() error {
+		return pterm.DefaultBigText.WithLetters(
+			putils.LettersFromStringWithStyle("sim", pterm.NewStyle(pterm.FgGreen)),
+			putils.LettersFromStringWithStyle("-cli", pterm.NewStyle(pterm.FgGray)),
+		).Render()
+	}
 )
 
 var shellCmd = &cobra.Command{
@@ -25,7 +50,15 @@ restarting the container. Type 'help' for available commands, 'exit' to quit.`,
 		rootCmd.SilenceUsage = true
 		defer func() { rootCmd.SilenceUsage = false }()
 
-		reader := bufio.NewReader(os.Stdin)
+		if canUseLineEditor() {
+			if err := runShellWithLineEditor(); err != nil {
+				pterm.Warning.Printf("line editor disabled: %v\n", err)
+			} else {
+				return nil
+			}
+		}
+
+		reader := bufio.NewReader(shellStdin())
 		for {
 			printPrompt()
 
@@ -33,34 +66,92 @@ restarting the container. Type 'help' for available commands, 'exit' to quit.`,
 			if err != nil {
 				if err == io.EOF {
 					fmt.Println()
-					pterm.Info.Println("Goodbye!")
+					pterm.Info.Println(goodbyeMessage)
 				}
 				return nil
 			}
 
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			if line == "exit" || line == "quit" {
-				pterm.Info.Println("Goodbye!")
+			if processShellLine(line) {
 				return nil
-			}
-
-			// Prevent the user from nesting shells.
-			parts := strings.Fields(line)
-			if parts[0] == "shell" {
-				pterm.Warning.Println("Already inside a shell session.")
-				continue
-			}
-
-			resetAllCommandFlags(rootCmd)
-			rootCmd.SetArgs(parts)
-			if execErr := rootCmd.Execute(); execErr != nil {
-				pterm.Error.Println(execErr)
 			}
 		}
 	},
+}
+
+func canUseLineEditor() bool {
+	return shellIsTerminal(int(shellStdin().Fd())) && shellIsTerminal(int(shellStdout().Fd()))
+}
+
+func runShellWithLineEditor() error {
+	stdin := shellStdin()
+	stdout := shellStdout()
+
+	fd := int(stdin.Fd())
+	oldState, err := shellMakeRaw(fd)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = shellRestore(fd, oldState)
+	}()
+
+	lineEditor := shellNewEditor(struct {
+		io.Reader
+		io.Writer
+	}{
+		Reader: stdin,
+		Writer: stdout,
+	}, "sim-cli> ")
+
+	for {
+		line, readErr := lineEditor.ReadLine()
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				fmt.Println()
+				pterm.Info.Println(goodbyeMessage)
+				return nil
+			}
+			return readErr
+		}
+
+		// Leave raw mode while the command runs so output renders correctly.
+		if err := shellRestore(fd, oldState); err != nil {
+			return err
+		}
+		shouldExit := processShellLine(line)
+		if _, err := shellMakeRaw(fd); err != nil {
+			return err
+		}
+		if shouldExit {
+			return nil
+		}
+	}
+}
+
+func processShellLine(line string) bool {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return false
+	}
+	if line == "exit" || line == "quit" {
+		pterm.Info.Println(goodbyeMessage)
+		return true
+	}
+
+	// Prevent the user from nesting shells.
+	args := strings.Fields(line)
+	if args[0] == "shell" {
+		pterm.Warning.Println("Already inside a shell session.")
+		return false
+	}
+
+	resetAllCommandFlags(rootCmd)
+	rootCmd.SetArgs(args)
+	if err := rootCmd.Execute(); err != nil {
+		pterm.Error.Println(err)
+	}
+
+	return false
 }
 
 func printPrompt() {
@@ -73,10 +164,7 @@ func printPrompt() {
 
 func printWelcomeBanner() {
 	if !pterm.RawOutput {
-		if err := pterm.DefaultBigText.WithLetters(
-			putils.LettersFromStringWithStyle("sim", pterm.NewStyle(pterm.FgGreen)),
-			putils.LettersFromStringWithStyle("-cli", pterm.NewStyle(pterm.FgGray)),
-		).Render(); err != nil {
+		if err := renderWelcomeBigText(); err != nil {
 			pterm.Warning.Printf("failed to render banner: %v\n", err)
 		}
 	}

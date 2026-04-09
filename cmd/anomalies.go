@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/NoTIPswe/notip-simulator-cli/internal/client"
 	"github.com/spf13/cobra"
@@ -70,14 +69,11 @@ var anomaliesNetworkDegradationCmd = &cobra.Command{
 // ── outlier ───────────────────────────────────────────────────────────────────
 
 var anomaliesOutlierCmd = &cobra.Command{
-	Use:   "outlier <sensor-int-id>",
-	Short: "Inject an outlier reading into a sensor (uses the numeric sensor ID)",
+	Use:   "outlier <sensor-uuid>",
+	Short: "Inject an outlier reading into a sensor",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sensorID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("sensor-id must be a numeric ID: %w", err)
-		}
+		sensorID := args[0]
 
 		var valuePtr *float64
 		if cmd.Flags().Changed("value") {
@@ -86,13 +82,13 @@ var anomaliesOutlierCmd = &cobra.Command{
 		}
 
 		spinner := startSpinner(
-			fmt.Sprintf("Injecting outlier into sensor %d...", sensorID),
+			fmt.Sprintf("Injecting outlier into sensor %s...", sensorID),
 		)
 		if err := client.New(simulatorURL).WithContext(cmd.Context()).InjectOutlier(sensorID, valuePtr); err != nil {
 			spinner.Fail("Failed to inject outlier")
 			return err
 		}
-		spinner.Success(fmt.Sprintf("Outlier injected into sensor %d", sensorID))
+		spinner.Success(fmt.Sprintf("Outlier injected into sensor %s", sensorID))
 		return nil
 	},
 }

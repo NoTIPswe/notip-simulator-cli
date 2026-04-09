@@ -1,7 +1,7 @@
 // request_construction_test.go verifies that every client method builds the HTTP
 // request exactly as the simulator backend expects it:
 //   - correct HTTP method
-//   - correct URL path (including /sim/ prefix and numeric vs UUID IDs)
+//   - correct URL path (including /sim/ prefix and UUID/public string IDs)
 //   - correct Content-Type header on POST-with-body requests
 //   - exact JSON field names in the request body
 //   - omitempty: optional fields are absent when zero-valued
@@ -15,6 +15,15 @@ import (
 	"testing"
 
 	"github.com/NoTIPswe/notip-simulator-cli/internal/client"
+)
+
+const (
+	reqHeaderContentType = "Content-Type"
+	reqMediaTypeJSON     = "application/json"
+	fmtMethodWantPost    = "method = %s, want POST"
+	fmtPathOnly          = "path = %s"
+	errUnexpected        = "unexpected error: %v"
+	testGatewayUUIDX     = "uuid-x"
 )
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -37,9 +46,9 @@ func readBodyAsMap(t *testing.T, r *http.Request) map[string]any {
 
 func assertContentType(t *testing.T, r *http.Request) {
 	t.Helper()
-	ct := r.Header.Get("Content-Type")
-	if ct != "application/json" {
-		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
+	ct := r.Header.Get(reqHeaderContentType)
+	if ct != reqMediaTypeJSON {
+		t.Errorf("Content-Type = %q, want %q", ct, reqMediaTypeJSON)
 	}
 }
 
@@ -72,10 +81,10 @@ func assertKeyAbsent(t *testing.T, m map[string]any, key string) {
 
 // ── POST /sim/gateways — single create ───────────────────────────────────────
 
-func TestCreateGateway_RequestConstruction(t *testing.T) {
+func TestCreateGatewayRequestConstruction(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			t.Errorf("method = %s, want POST", r.Method)
+			t.Errorf(fmtMethodWantPost, r.Method)
 		}
 		if r.URL.Path != "/sim/gateways" {
 			t.Errorf("path = %s, want /sim/gateways", r.URL.Path)
@@ -85,50 +94,47 @@ func TestCreateGateway_RequestConstruction(t *testing.T) {
 		body := readBodyAsMap(t, r)
 		assertKey(t, body, "factoryId", "fac-1")
 		assertKey(t, body, "factoryKey", "key-secret")
-		assertKey(t, body, "serialNumber", "SN-001")
 		assertKey(t, body, "model", "GW-X200")
 		assertKey(t, body, "firmwareVersion", "2.1.0")
 		assertKey(t, body, "sendFrequencyMs", float64(500))
 
-		writeJSON(w, http.StatusCreated, client.Gateway{ID: 1})
+		writeJSON(w, http.StatusCreated, client.Gateway{ID: "gw-1"})
 	})
 
 	_, err := c.CreateGateway(client.CreateGatewayRequest{
 		FactoryID:       "fac-1",
 		FactoryKey:      "key-secret",
-		SerialNumber:    "SN-001",
 		Model:           "GW-X200",
 		FirmwareVersion: "2.1.0",
 		SendFrequencyMs: 500,
 	})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(errUnexpected, err)
 	}
 }
 
-func TestCreateGateway_OptionalFields_OmittedWhenZero(t *testing.T) {
+func TestCreateGatewayOptionalFieldsOmittedWhenZero(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		body := readBodyAsMap(t, r)
 		// model, firmwareVersion, sendFrequencyMs are omitempty — absent when zero
 		assertKeyAbsent(t, body, "model")
 		assertKeyAbsent(t, body, "firmwareVersion")
 		assertKeyAbsent(t, body, "sendFrequencyMs")
-		writeJSON(w, http.StatusCreated, client.Gateway{ID: 1})
+		writeJSON(w, http.StatusCreated, client.Gateway{ID: "gw-1"})
 	})
 
 	_, _ = c.CreateGateway(client.CreateGatewayRequest{
-		FactoryID:    "f",
-		FactoryKey:   "k",
-		SerialNumber: "SN",
+		FactoryID:  "f",
+		FactoryKey: "k",
 	})
 }
 
 // ── POST /sim/gateways/bulk ───────────────────────────────────────────────────
 
-func TestBulkCreateGateways_RequestConstruction(t *testing.T) {
+func TestBulkCreateGatewaysRequestConstruction(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			t.Errorf("method = %s, want POST", r.Method)
+			t.Errorf(fmtMethodWantPost, r.Method)
 		}
 		if r.URL.Path != "/sim/gateways/bulk" {
 			t.Errorf("path = %s, want /sim/gateways/bulk", r.URL.Path)
@@ -144,7 +150,7 @@ func TestBulkCreateGateways_RequestConstruction(t *testing.T) {
 		assertKey(t, body, "sendFrequencyMs", float64(2000))
 
 		writeJSON(w, http.StatusCreated, client.BulkCreateResponse{
-			Gateways: []client.Gateway{{ID: 1}, {ID: 2}, {ID: 3}},
+			Gateways: []client.Gateway{{ID: "gw-1"}, {ID: "gw-2"}, {ID: "gw-3"}},
 			Errors:   []string{"", "", ""},
 		})
 	})
@@ -158,11 +164,11 @@ func TestBulkCreateGateways_RequestConstruction(t *testing.T) {
 		SendFrequencyMs: 2000,
 	})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(errUnexpected, err)
 	}
 }
 
-func TestBulkCreateGateways_OptionalFields_OmittedWhenZero(t *testing.T) {
+func TestBulkCreateGatewaysOptionalFieldsOmittedWhenZero(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		body := readBodyAsMap(t, r)
 		assertKeyAbsent(t, body, "model")
@@ -175,10 +181,10 @@ func TestBulkCreateGateways_OptionalFields_OmittedWhenZero(t *testing.T) {
 
 // ── GET /sim/gateways — no body ───────────────────────────────────────────────
 
-func TestListGateways_NoBodyNoContentType(t *testing.T) {
+func TestListGatewaysNoBodyNoContentType(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "" {
-			t.Errorf("GET should not set Content-Type, got %q", r.Header.Get("Content-Type"))
+		if r.Header.Get(reqHeaderContentType) != "" {
+			t.Errorf("GET should not set Content-Type, got %q", r.Header.Get(reqHeaderContentType))
 		}
 		assertNoBody(t, r)
 		writeJSON(w, http.StatusOK, []client.Gateway{})
@@ -188,13 +194,13 @@ func TestListGateways_NoBodyNoContentType(t *testing.T) {
 
 // ── POST /sim/gateways/{id}/start & stop — no body ───────────────────────────
 
-func TestStartGateway_NoBody(t *testing.T) {
+func TestStartGatewayNoBody(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/sim/gateways/uuid-abc/start" {
-			t.Errorf("path = %s", r.URL.Path)
+			t.Errorf(fmtPathOnly, r.URL.Path)
 		}
 		// POST with no body: Content-Type should not be set
-		if r.Header.Get("Content-Type") != "" {
+		if r.Header.Get(reqHeaderContentType) != "" {
 			t.Errorf("POST-no-body should not set Content-Type")
 		}
 		assertNoBody(t, r)
@@ -203,12 +209,12 @@ func TestStartGateway_NoBody(t *testing.T) {
 	_ = c.StartGateway("uuid-abc")
 }
 
-func TestStopGateway_NoBody(t *testing.T) {
+func TestStopGatewayNoBody(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/sim/gateways/uuid-abc/stop" {
-			t.Errorf("path = %s", r.URL.Path)
+			t.Errorf(fmtPathOnly, r.URL.Path)
 		}
-		if r.Header.Get("Content-Type") != "" {
+		if r.Header.Get(reqHeaderContentType) != "" {
 			t.Errorf("POST-no-body should not set Content-Type")
 		}
 		assertNoBody(t, r)
@@ -219,13 +225,13 @@ func TestStopGateway_NoBody(t *testing.T) {
 
 // ── DELETE /sim/gateways/{id} — no body ──────────────────────────────────────
 
-func TestDeleteGateway_MethodAndNoBody(t *testing.T) {
+func TestDeleteGatewayMethodAndNoBody(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("method = %s, want DELETE", r.Method)
 		}
 		if r.URL.Path != "/sim/gateways/uuid-del" {
-			t.Errorf("path = %s", r.URL.Path)
+			t.Errorf(fmtPathOnly, r.URL.Path)
 		}
 		assertNoBody(t, r)
 		w.WriteHeader(http.StatusNoContent)
@@ -238,13 +244,13 @@ func TestDeleteGateway_MethodAndNoBody(t *testing.T) {
 // CRITICAL: CLI flags --min/--max must map to "minRange"/"maxRange" in JSON,
 // not "min"/"max". This is the field name the backend expects.
 
-func TestAddSensor_RequestFieldNames(t *testing.T) {
+func TestAddSensorRequestFieldNames(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			t.Errorf("method = %s, want POST", r.Method)
+			t.Errorf(fmtMethodWantPost, r.Method)
 		}
-		if r.URL.Path != "/sim/gateways/7/sensors" {
-			t.Errorf("path = %s, want /sim/gateways/7/sensors", r.URL.Path)
+		if r.URL.Path != "/sim/gateways/gw-public-7/sensors" {
+			t.Errorf("path = %s, want /sim/gateways/gw-public-7/sensors", r.URL.Path)
 		}
 		assertContentType(t, r)
 
@@ -260,55 +266,54 @@ func TestAddSensor_RequestFieldNames(t *testing.T) {
 		// Field name must be "type"
 		assertKey(t, body, "type", "temperature")
 
-		writeJSON(w, http.StatusCreated, client.Sensor{ID: 1})
+		writeJSON(w, http.StatusCreated, client.Sensor{ID: "sensor-1"})
 	})
 
-	_, err := c.AddSensor(7, client.AddSensorRequest{
+	_, err := c.AddSensor("gw-public-7", client.AddSensorRequest{
 		Type:      "temperature",
 		MinRange:  -10,
 		MaxRange:  120,
 		Algorithm: "sine_wave",
 	})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(errUnexpected, err)
 	}
 }
 
-// ── GET /sim/gateways/{id}/sensors — numeric ID in path ──────────────────────
+// ── GET /sim/gateways/{id}/sensors — gateway ID in path ──────────────────────
 
-func TestListSensors_NumericIDInPath(t *testing.T) {
+func TestListSensorsGatewayIDInPath(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		// ID must be the numeric int64, not a UUID
-		if r.URL.Path != "/sim/gateways/1234567890/sensors" {
-			t.Errorf("path = %s, want /sim/gateways/1234567890/sensors", r.URL.Path)
+		if r.URL.Path != "/sim/gateways/gw-public-123/sensors" {
+			t.Errorf("path = %s, want /sim/gateways/gw-public-123/sensors", r.URL.Path)
 		}
 		writeJSON(w, http.StatusOK, []client.Sensor{})
 	})
-	_, _ = c.ListSensors(1234567890)
+	_, _ = c.ListSensors("gw-public-123")
 }
 
-// ── DELETE /sim/sensors/{sensorId} — numeric ID in path ──────────────────────
+// ── DELETE /sim/sensors/{sensorId} — sensor ID in path ───────────────────────
 
-func TestDeleteSensor_NumericIDInPath(t *testing.T) {
+func TestDeleteSensorSensorIDInPath(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("method = %s, want DELETE", r.Method)
 		}
-		if r.URL.Path != "/sim/sensors/42" {
-			t.Errorf("path = %s, want /sim/sensors/42", r.URL.Path)
+		if r.URL.Path != "/sim/sensors/sensor-42" {
+			t.Errorf("path = %s, want /sim/sensors/sensor-42", r.URL.Path)
 		}
 		assertNoBody(t, r)
 		w.WriteHeader(http.StatusNoContent)
 	})
-	_ = c.DeleteSensor(42)
+	_ = c.DeleteSensor("sensor-42")
 }
 
 // ── POST /sim/gateways/{id}/anomaly/disconnect — duration_seconds field ───────
 
-func TestDisconnect_RequestFieldNames(t *testing.T) {
+func TestDisconnectRequestFieldNames(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/sim/gateways/uuid-x/anomaly/disconnect" {
-			t.Errorf("path = %s", r.URL.Path)
+		if r.URL.Path != "/sim/gateways/"+testGatewayUUIDX+"/anomaly/disconnect" {
+			t.Errorf(fmtPathOnly, r.URL.Path)
 		}
 		assertContentType(t, r)
 
@@ -320,15 +325,15 @@ func TestDisconnect_RequestFieldNames(t *testing.T) {
 
 		w.WriteHeader(http.StatusNoContent)
 	})
-	_ = c.Disconnect("uuid-x", 7)
+	_ = c.Disconnect(testGatewayUUIDX, 7)
 }
 
 // ── POST /sim/gateways/{id}/anomaly/network-degradation ──────────────────────
 
-func TestNetworkDegradation_RequestFieldNames(t *testing.T) {
+func TestNetworkDegradationRequestFieldNames(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/sim/gateways/uuid-x/anomaly/network-degradation" {
-			t.Errorf("path = %s", r.URL.Path)
+		if r.URL.Path != "/sim/gateways/"+testGatewayUUIDX+"/anomaly/network-degradation" {
+			t.Errorf(fmtPathOnly, r.URL.Path)
 		}
 		assertContentType(t, r)
 
@@ -341,26 +346,26 @@ func TestNetworkDegradation_RequestFieldNames(t *testing.T) {
 
 		w.WriteHeader(http.StatusNoContent)
 	})
-	_ = c.InjectNetworkDegradation("uuid-x", 15, 0.25)
+	_ = c.InjectNetworkDegradation(testGatewayUUIDX, 15, 0.25)
 }
 
-func TestNetworkDegradation_PacketLossOmitted_WhenZero(t *testing.T) {
+func TestNetworkDegradationPacketLossOmittedWhenZero(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		body := readBodyAsMap(t, r)
 		// 0.0 with omitempty → field must be absent so backend applies its default (0.3)
 		assertKeyAbsent(t, body, "packet_loss_pct")
 		w.WriteHeader(http.StatusNoContent)
 	})
-	_ = c.InjectNetworkDegradation("uuid-x", 5, 0)
+	_ = c.InjectNetworkDegradation(testGatewayUUIDX, 5, 0)
 }
 
 // ── POST /sim/sensors/{sensorId}/anomaly/outlier ──────────────────────────────
 
-func TestOutlier_RequestFieldNames_WithValue(t *testing.T) {
+func TestOutlierRequestFieldNamesWithValue(t *testing.T) {
 	val := 42.5
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/sim/sensors/99/anomaly/outlier" {
-			t.Errorf("path = %s, want /sim/sensors/99/anomaly/outlier", r.URL.Path)
+		if r.URL.Path != "/sim/sensors/sensor-99/anomaly/outlier" {
+			t.Errorf("path = %s, want /sim/sensors/sensor-99/anomaly/outlier", r.URL.Path)
 		}
 		assertContentType(t, r)
 
@@ -369,17 +374,17 @@ func TestOutlier_RequestFieldNames_WithValue(t *testing.T) {
 
 		w.WriteHeader(http.StatusNoContent)
 	})
-	_ = c.InjectOutlier(99, &val)
+	_ = c.InjectOutlier("sensor-99", &val)
 }
 
-func TestOutlier_ValueOmitted_WhenNil(t *testing.T) {
+func TestOutlierValueOmittedWhenNil(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		body := readBodyAsMap(t, r)
 		// nil pointer + omitempty → "value" key must be absent
 		assertKeyAbsent(t, body, "value")
 		w.WriteHeader(http.StatusNoContent)
 	})
-	_ = c.InjectOutlier(99, nil)
+	_ = c.InjectOutlier("sensor-99", nil)
 }
 
 // ── Default SIMULATOR_URL matches docker-compose service name ─────────────────

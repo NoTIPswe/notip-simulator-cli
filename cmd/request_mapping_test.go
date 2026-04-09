@@ -13,7 +13,6 @@ import (
 
 const (
 	fmtUnexpectedError = "unexpected error: %v"
-	flagSerialArg      = "--serial"
 )
 
 // readBody parses the request body into a generic map for field inspection.
@@ -62,59 +61,53 @@ func TestGatewaysCreateFlagToJSONMapping(t *testing.T) {
 		body := readBody(t, r)
 		checkKey(t, body, "factoryId", "fac-42")
 		checkKey(t, body, "factoryKey", "secret-key")
-		checkKey(t, body, "serialNumber", "SN-XYZ")
 		checkKey(t, body, "model", "GW-PRO")
 		checkKey(t, body, "firmwareVersion", "3.0.1")
 		checkKey(t, body, "sendFrequencyMs", float64(250))
 
-		writeJSON(w, http.StatusCreated, map[string]any{"id": 1})
+		writeJSON(w, http.StatusCreated, map[string]any{"id": "gw-1"})
 	})
 
 	err := runCmd("gateways", "create",
 		testFlagFactoryID, "fac-42",
 		testFlagFactoryKey, "secret-key",
-		flagSerialArg, "SN-XYZ",
-		"--model", "GW-PRO",
-		"--firmware", "3.0.1",
-		"--freq", "250",
+		testFlagModel, "GW-PRO",
+		testFlagFirmware, "3.0.1",
+		testFlagFreq, "250",
 	)
 	if err != nil {
 		t.Fatalf("gateways create failed: %v", err)
 	}
 }
 
-func TestGatewaysCreateDefaultFreqIs1000(t *testing.T) {
+func TestGatewaysCreateFreqMapping(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
 		body := readBody(t, r)
 		checkKey(t, body, "sendFrequencyMs", float64(1000))
-		writeJSON(w, http.StatusCreated, map[string]any{"id": 1})
+		writeJSON(w, http.StatusCreated, map[string]any{"id": "gw-1"})
 	})
 
 	err := runCmd("gateways", "create",
 		testFlagFactoryID, "f",
 		testFlagFactoryKey, "k",
-		flagSerialArg, "SN",
+		testFlagModel, "GW-X",
+		testFlagFirmware, "1.0.0",
+		testFlagFreq, "1000",
 	)
 	if err != nil {
 		t.Fatalf(fmtUnexpectedError, err)
 	}
 }
 
-func TestGatewaysCreateOptionalFieldsOmittedWhenNotProvided(t *testing.T) {
-	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		body := readBody(t, r)
-		checkAbsent(t, body, "model")
-		checkAbsent(t, body, "firmwareVersion")
-		writeJSON(w, http.StatusCreated, map[string]any{"id": 1})
-	})
-
+func TestGatewaysCreateMissingModelFails(t *testing.T) {
 	err := runCmd("gateways", "create",
 		testFlagFactoryID, "f",
 		testFlagFactoryKey, "k",
-		flagSerialArg, "SN",
+		testFlagFirmware, "1.0.0",
+		testFlagFreq, "1000",
 	)
-	if err != nil {
-		t.Fatalf(fmtUnexpectedError, err)
+	if err == nil {
+		t.Fatal("expected error when --model is missing")
 	}
 }
 
@@ -143,9 +136,9 @@ func TestGatewaysBulkFlagToJSONMapping(t *testing.T) {
 		"--count", "5",
 		testFlagFactoryID, "fac-bulk",
 		testFlagFactoryKey, "key-bulk",
-		"--model", "GW-MINI",
-		"--firmware", "1.2.3",
-		"--freq", "500",
+		testFlagModel, "GW-MINI",
+		testFlagFirmware, "1.2.3",
+		testFlagFreq, "500",
 	)
 	if err != nil {
 		t.Fatalf("gateways bulk failed: %v", err)
@@ -160,11 +153,10 @@ func TestGatewaysGetIntegration(t *testing.T) {
 			t.Errorf(fmtUnexpectedRequest, r.Method, r.URL.Path)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"id":                  42,
+			"id":                  "gw-42",
 			"managementGatewayId": "uuid-get-1",
 			"status":              "online",
 			"model":               "GW-X",
-			"serialNumber":        "SN001",
 			"firmwareVersion":     "1.0",
 			"sendFrequencyMs":     1000,
 			"tenantId":            "t-1",
@@ -191,25 +183,35 @@ func TestGatewaysGetNotFound(t *testing.T) {
 
 func TestSensorsAddFlagToJSONMapping(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/sim/gateways/5/sensors" {
-			t.Errorf(fmtUnexpectedRequest, r.Method, r.URL.Path)
+		switch r.URL.Path {
+		case "/sim/gateways/uuid-gw-1":
+			writeJSON(w, http.StatusOK, map[string]any{
+				"id":                  "gw-public-5",
+				"managementGatewayId": "uuid-gw-1",
+			})
+		case "/sim/gateways/gw-public-5/sensors":
+			if r.Method != http.MethodPost {
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
+			body := readBody(t, r)
+
+			checkKey(t, body, "type", "humidity")
+			checkKey(t, body, "minRange", float64(10))
+			checkAbsent(t, body, "min")
+			checkKey(t, body, "maxRange", float64(90))
+			checkAbsent(t, body, "max")
+			checkKey(t, body, "algorithm", "uniform_random")
+
+			writeJSON(w, http.StatusCreated, map[string]any{
+				"id": "s-uuid", "gatewayId": "gw-public-5",
+				"type": "humidity", "minRange": 10, "maxRange": 90, "algorithm": "uniform_random",
+			})
+		default:
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
 		}
-		body := readBody(t, r)
-
-		checkKey(t, body, "type", "humidity")
-		checkKey(t, body, "minRange", float64(10))
-		checkAbsent(t, body, "min")
-		checkKey(t, body, "maxRange", float64(90))
-		checkAbsent(t, body, "max")
-		checkKey(t, body, "algorithm", "uniform_random")
-
-		writeJSON(w, http.StatusCreated, map[string]any{
-			"id": 1, "gatewayId": 5, "sensorId": "s-uuid",
-			"type": "humidity", "minRange": 10, "maxRange": 90, "algorithm": "uniform_random",
-		})
 	})
 
-	err := runCmd("sensors", "add", "5",
+	err := runCmd("sensors", "add", "uuid-gw-1",
 		"--type", "humidity",
 		"--min", "10",
 		"--max", "90",
@@ -222,13 +224,23 @@ func TestSensorsAddFlagToJSONMapping(t *testing.T) {
 
 func TestSensorsAddNegativeMinRange(t *testing.T) {
 	newMockServer(t, func(w http.ResponseWriter, r *http.Request) {
-		body := readBody(t, r)
-		checkKey(t, body, "minRange", float64(-40))
-		checkKey(t, body, "maxRange", float64(85))
-		writeJSON(w, http.StatusCreated, map[string]any{"id": 2, "gatewayId": 3, "sensorId": "s-2"})
+		switch r.URL.Path {
+		case "/sim/gateways/uuid-gw-2":
+			writeJSON(w, http.StatusOK, map[string]any{
+				"id":                  "gw-public-3",
+				"managementGatewayId": "uuid-gw-2",
+			})
+		case "/sim/gateways/gw-public-3/sensors":
+			body := readBody(t, r)
+			checkKey(t, body, "minRange", float64(-40))
+			checkKey(t, body, "maxRange", float64(85))
+			writeJSON(w, http.StatusCreated, map[string]any{"id": "s-2", "gatewayId": "gw-public-3"})
+		default:
+			t.Errorf(fmtUnexpectedPath, r.URL.Path)
+		}
 	})
 
-	err := runCmd("sensors", "add", "3",
+	err := runCmd("sensors", "add", "uuid-gw-2",
 		"--type", "temperature",
 		"--min", "-40",
 		"--max", "85",

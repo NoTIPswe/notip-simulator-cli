@@ -41,15 +41,14 @@ var gatewaysListCmd = &cobra.Command{
 		}
 
 		tableData := pterm.TableData{
-			{"ID", "UUID", "Status", "Model", "Serial", "Freq (ms)", "Tenant"},
+			{"ID", "UUID", "Status", "Model", "Freq (ms)", "Tenant"},
 		}
 		for _, gw := range gateways {
 			tableData = append(tableData, []string{
-				strconv.FormatInt(gw.ID, 10),
-				gw.ManagementGatewayID,
+				gw.ID,
+				gatewayUUID(gw),
 				statusStyle(gw.Status),
 				gw.Model,
-				gw.SerialNumber,
 				strconv.Itoa(gw.SendFrequencyMs),
 				gw.TenantID,
 			})
@@ -77,10 +76,9 @@ var gatewaysGetCmd = &cobra.Command{
 
 		return pterm.DefaultTable.WithData(pterm.TableData{
 			{"Field", "Value"},
-			{"ID", strconv.FormatInt(gw.ID, 10)},
-			{"UUID", gw.ManagementGatewayID},
+			{"ID", gw.ID},
+			{"UUID", gatewayUUID(*gw)},
 			{"Factory ID", gw.FactoryID},
-			{"Serial", gw.SerialNumber},
 			{"Model", gw.Model},
 			{"Firmware", gw.FirmwareVersion},
 			{"Status", statusStyle(gw.Status)},
@@ -101,7 +99,6 @@ var gatewaysCreateCmd = &cobra.Command{
 		req := client.CreateGatewayRequest{}
 		req.FactoryID, _ = cmd.Flags().GetString(flagFactoryID)
 		req.FactoryKey, _ = cmd.Flags().GetString(flagFactoryKey)
-		req.SerialNumber, _ = cmd.Flags().GetString("serial")
 		req.Model, _ = cmd.Flags().GetString("model")
 		req.FirmwareVersion, _ = cmd.Flags().GetString("firmware")
 		req.SendFrequencyMs, _ = cmd.Flags().GetInt("freq")
@@ -235,18 +232,24 @@ func printGatewayTable(gateways []client.Gateway) {
 	if len(gateways) == 0 {
 		return
 	}
-	tableData := pterm.TableData{{"ID", "UUID", "Status", "Model", "Serial", "Freq (ms)"}}
+	tableData := pterm.TableData{{"ID", "UUID", "Status", "Model", "Freq (ms)"}}
 	for _, gw := range gateways {
 		tableData = append(tableData, []string{
-			strconv.FormatInt(gw.ID, 10),
-			gw.ManagementGatewayID,
+			gw.ID,
+			gatewayUUID(gw),
 			statusStyle(gw.Status),
 			gw.Model,
-			gw.SerialNumber,
 			strconv.Itoa(gw.SendFrequencyMs),
 		})
 	}
 	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render() //nolint:errcheck
+}
+
+func gatewayUUID(gw client.Gateway) string {
+	if gw.ManagementGatewayID != "" {
+		return gw.ManagementGatewayID
+	}
+	return gw.ID
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
@@ -266,11 +269,10 @@ func init() {
 	// create flags
 	gatewaysCreateCmd.Flags().String(flagFactoryID, "", "Factory ID (required)")
 	gatewaysCreateCmd.Flags().String(flagFactoryKey, "", "Factory key (required)")
-	gatewaysCreateCmd.Flags().String("serial", "", "Serial number (required)")
-	gatewaysCreateCmd.Flags().String("model", "", "Gateway model")
-	gatewaysCreateCmd.Flags().String("firmware", "", "Firmware version")
-	gatewaysCreateCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds")
-	for _, f := range []string{flagFactoryID, flagFactoryKey, "serial"} {
+	gatewaysCreateCmd.Flags().String("model", "", "Gateway model (required)")
+	gatewaysCreateCmd.Flags().String("firmware", "", "Firmware version (required)")
+	gatewaysCreateCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds (required)")
+	for _, f := range []string{flagFactoryID, flagFactoryKey, "model", "firmware", "freq"} {
 		mustMarkRequired(gatewaysCreateCmd, f)
 	}
 
@@ -278,10 +280,10 @@ func init() {
 	gatewaysBulkCmd.Flags().Int("count", 1, "Number of gateways to create (required)")
 	gatewaysBulkCmd.Flags().String(flagFactoryID, "", "Factory ID (required)")
 	gatewaysBulkCmd.Flags().String(flagFactoryKey, "", "Factory key (required)")
-	gatewaysBulkCmd.Flags().String("model", "", "Gateway model")
-	gatewaysBulkCmd.Flags().String("firmware", "", "Firmware version")
-	gatewaysBulkCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds")
-	for _, f := range []string{"count", flagFactoryID, flagFactoryKey} {
+	gatewaysBulkCmd.Flags().String("model", "", "Gateway model (required)")
+	gatewaysBulkCmd.Flags().String("firmware", "", "Firmware version (required)")
+	gatewaysBulkCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds (required)")
+	for _, f := range []string{"count", flagFactoryID, flagFactoryKey, "model", "firmware", "freq"} {
 		mustMarkRequired(gatewaysBulkCmd, f)
 	}
 }

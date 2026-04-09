@@ -22,25 +22,43 @@ docker compose run --rm sim-cli --help
 # List all gateways (requires -it for styled output)
 docker compose run --rm -it sim-cli gateways list
 
-# Create 5 gateways for a tenant
-docker compose run --rm sim-cli gateways create --count 5 --tenant <uuid>
+# Create a single gateway
+docker compose run --rm sim-cli gateways create \
+  --factory-id FAC-001 \
+  --factory-key KEY-001 \
+  --model GW-X \
+  --firmware 1.0.0 \
+  --freq 1000
 
-# Delete a gateway by ID
-docker compose run --rm sim-cli gateways delete <id>
+# Bulk create 5 gateways
+docker compose run --rm sim-cli gateways bulk \
+  --count 5 \
+  --factory-id FAC-001 \
+  --factory-key KEY-001 \
+  --model GW-X \
+  --firmware 1.0.0 \
+  --freq 1000
+
+# Delete a gateway by UUID
+docker compose run --rm sim-cli gateways delete <gateway-uuid>
 ```
 
 ### Sensors
 
 ```bash
-# Add a temperature sensor to a gateway
-docker compose run --rm sim-cli sensors add <gateway-id> --type temperature --min 20.0 --max 80.0
+# Add a temperature sensor to a gateway (numeric ID or UUID)
+docker compose run --rm sim-cli sensors add <gateway-id-or-uuid> \
+  --type temperature \
+  --min 20.0 \
+  --max 80.0 \
+  --algorithm uniform_random
 ```
 
 ### Anomalies
 
 ```bash
 # Trigger a disconnect anomaly on a gateway
-docker compose run --rm sim-cli anomalies disconnect <gateway-id>
+docker compose run --rm sim-cli anomalies disconnect <gateway-uuid> --duration 10
 ```
 
 ## Docker Compose configuration

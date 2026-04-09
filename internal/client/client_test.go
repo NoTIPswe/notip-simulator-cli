@@ -1,8 +1,10 @@
 package client_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -63,23 +65,22 @@ func assertPath(t *testing.T, r *http.Request, want string) {
 // ── Gateway ───────────────────────────────────────────────────────────────────
 
 func TestCreateGatewaySuccess(t *testing.T) {
-	want := client.Gateway{ID: 1, ManagementGatewayID: gwUUID1, Status: "online"}
+	want := client.Gateway{ID: "gw-1", ManagementGatewayID: gwUUID1, Status: "online"}
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodPost)
 		assertPath(t, r, "/sim/gateways")
 
 		var req client.CreateGatewayRequest
 		decodeBody(t, r, &req)
-		if req.FactoryID != "fac-1" || req.SerialNumber != "SN-001" {
+		if req.FactoryID != "fac-1" {
 			t.Errorf("unexpected request body: %+v", req)
 		}
 		writeJSON(w, http.StatusCreated, want)
 	})
 
 	got, err := c.CreateGateway(client.CreateGatewayRequest{
-		FactoryID:    "fac-1",
-		FactoryKey:   "key-1",
-		SerialNumber: "SN-001",
+		FactoryID:  "fac-1",
+		FactoryKey: "key-1",
 	})
 	if err != nil {
 		t.Fatalf(errFmtUnexpected, err)
@@ -101,7 +102,7 @@ func TestCreateGatewayServerError(t *testing.T) {
 
 func TestBulkCreateGatewaysAllSuccess(t *testing.T) {
 	want := client.BulkCreateResponse{
-		Gateways: []client.Gateway{{ID: 1}, {ID: 2}},
+		Gateways: []client.Gateway{{ID: "gw-1"}, {ID: "gw-2"}},
 		Errors:   []string{"", ""},
 	}
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +128,7 @@ func TestBulkCreateGatewaysAllSuccess(t *testing.T) {
 
 func TestBulkCreateGatewaysPartialErrors207(t *testing.T) {
 	want := client.BulkCreateResponse{
-		Gateways: []client.Gateway{{ID: 1}},
+		Gateways: []client.Gateway{{ID: "gw-1"}},
 		Errors:   []string{"", "factory key mismatch"},
 	}
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +145,7 @@ func TestBulkCreateGatewaysPartialErrors207(t *testing.T) {
 }
 
 func TestListGatewaysSuccess(t *testing.T) {
-	want := []client.Gateway{{ID: 1, Status: "online"}, {ID: 2, Status: "offline"}}
+	want := []client.Gateway{{ID: "gw-1", Status: "online"}, {ID: "gw-2", Status: "offline"}}
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodGet)
 		assertPath(t, r, "/sim/gateways")
@@ -177,7 +178,7 @@ func TestListGatewaysEmpty(t *testing.T) {
 }
 
 func TestGetGatewaySuccess(t *testing.T) {
-	want := client.Gateway{ID: 42, ManagementGatewayID: "uuid-42", Status: "online"}
+	want := client.Gateway{ID: "gw-42", ManagementGatewayID: "uuid-42", Status: "online"}
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodGet)
 		assertPath(t, r, "/sim/gateways/uuid-42")
@@ -188,8 +189,8 @@ func TestGetGatewaySuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFmtUnexpected, err)
 	}
-	if got.ID != 42 {
-		t.Errorf("got ID %d, want 42", got.ID)
+	if got.ID != "gw-42" {
+		t.Errorf("got ID %s, want gw-42", got.ID)
 	}
 }
 
@@ -257,10 +258,10 @@ func TestDeleteGatewayNotFound(t *testing.T) {
 // ── Sensor ────────────────────────────────────────────────────────────────────
 
 func TestAddSensorSuccess(t *testing.T) {
-	want := client.Sensor{ID: 10, GatewayID: 5, Type: "temperature", MinRange: 0, MaxRange: 100, Algorithm: "sine_wave"}
+	want := client.Sensor{ID: "sensor-10", GatewayID: "gw-5", Type: "temperature", MinRange: 0, MaxRange: 100, Algorithm: "sine_wave"}
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodPost)
-		assertPath(t, r, "/sim/gateways/5/sensors")
+		assertPath(t, r, "/sim/gateways/gw-5/sensors")
 
 		var req client.AddSensorRequest
 		decodeBody(t, r, &req)
@@ -270,7 +271,7 @@ func TestAddSensorSuccess(t *testing.T) {
 		writeJSON(w, http.StatusCreated, want)
 	})
 
-	got, err := c.AddSensor(5, client.AddSensorRequest{
+	got, err := c.AddSensor("gw-5", client.AddSensorRequest{
 		Type:      "temperature",
 		MinRange:  0,
 		MaxRange:  100,
@@ -279,7 +280,7 @@ func TestAddSensorSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFmtUnexpected, err)
 	}
-	if got.ID != 10 || got.Type != "temperature" {
+	if got.ID != "sensor-10" || got.Type != "temperature" {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
@@ -288,7 +289,7 @@ func TestAddSensorGatewayNotFound(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errMsgNotFound, http.StatusNotFound)
 	})
-	_, err := c.AddSensor(999, client.AddSensorRequest{Type: "temperature", Algorithm: "constant"})
+	_, err := c.AddSensor("ghost", client.AddSensorRequest{Type: "temperature", Algorithm: "constant"})
 	if err == nil {
 		t.Fatal(errExpected404)
 	}
@@ -296,16 +297,16 @@ func TestAddSensorGatewayNotFound(t *testing.T) {
 
 func TestListSensorsSuccess(t *testing.T) {
 	want := []client.Sensor{
-		{ID: 1, Type: "temperature"},
-		{ID: 2, Type: "humidity"},
+		{ID: "sensor-1", Type: "temperature"},
+		{ID: "sensor-2", Type: "humidity"},
 	}
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodGet)
-		assertPath(t, r, "/sim/gateways/7/sensors")
+		assertPath(t, r, "/sim/gateways/gw-7/sensors")
 		writeJSON(w, http.StatusOK, want)
 	})
 
-	got, err := c.ListSensors(7)
+	got, err := c.ListSensors("gw-7")
 	if err != nil {
 		t.Fatalf(errFmtUnexpected, err)
 	}
@@ -317,10 +318,10 @@ func TestListSensorsSuccess(t *testing.T) {
 func TestDeleteSensorSuccess(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodDelete)
-		assertPath(t, r, "/sim/sensors/99")
+		assertPath(t, r, "/sim/sensors/sensor-99")
 		w.WriteHeader(http.StatusNoContent)
 	})
-	if err := c.DeleteSensor(99); err != nil {
+	if err := c.DeleteSensor("sensor-99"); err != nil {
 		t.Fatalf(errFmtUnexpected, err)
 	}
 }
@@ -329,7 +330,7 @@ func TestDeleteSensorNotFound(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errMsgNotFound, http.StatusNotFound)
 	})
-	if err := c.DeleteSensor(0); err == nil {
+	if err := c.DeleteSensor("ghost"); err == nil {
 		t.Fatal(errExpected404)
 	}
 }
@@ -402,7 +403,7 @@ func TestInjectOutlierWithValue(t *testing.T) {
 	val := 999.9
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodPost)
-		assertPath(t, r, "/sim/sensors/42/anomaly/outlier")
+		assertPath(t, r, "/sim/sensors/sensor-42/anomaly/outlier")
 
 		body, _ := io.ReadAll(r.Body)
 		var req map[string]any
@@ -412,7 +413,7 @@ func TestInjectOutlierWithValue(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	if err := c.InjectOutlier(42, &val); err != nil {
+	if err := c.InjectOutlier("sensor-42", &val); err != nil {
 		t.Fatalf(errFmtUnexpected, err)
 	}
 }
@@ -427,7 +428,7 @@ func TestInjectOutlierNoValue(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	if err := c.InjectOutlier(42, nil); err != nil {
+	if err := c.InjectOutlier("sensor-42", nil); err != nil {
 		t.Fatalf(errFmtUnexpected, err)
 	}
 }
@@ -436,7 +437,7 @@ func TestInjectOutlierSensorNotFound(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errMsgNotFound, http.StatusNotFound)
 	})
-	if err := c.InjectOutlier(0, nil); err == nil {
+	if err := c.InjectOutlier("ghost", nil); err == nil {
 		t.Fatal(errExpected404)
 	}
 }
@@ -467,9 +468,8 @@ func TestCreateGatewayInvalidJSONResponse(t *testing.T) {
 	})
 
 	_, err := c.CreateGateway(client.CreateGatewayRequest{
-		FactoryID:    "f-1",
-		FactoryKey:   "k-1",
-		SerialNumber: "SN-1",
+		FactoryID:  "f-1",
+		FactoryKey: "k-1",
 	})
 	if err == nil {
 		t.Fatal(errExpectedDecode)
@@ -526,7 +526,7 @@ func TestAddSensorInvalidJSONResponse(t *testing.T) {
 		_, _ = w.Write([]byte(invalidJSONPayload))
 	})
 
-	_, err := c.AddSensor(1, client.AddSensorRequest{Type: "temperature", Algorithm: "constant"})
+	_, err := c.AddSensor("gw-1", client.AddSensorRequest{Type: "temperature", Algorithm: "constant"})
 	if err == nil {
 		t.Fatal(errExpectedDecode)
 	}
@@ -539,8 +539,64 @@ func TestListSensorsInvalidJSONResponse(t *testing.T) {
 		_, _ = w.Write([]byte(invalidJSONPayload))
 	})
 
-	_, err := c.ListSensors(1)
+	_, err := c.ListSensors("gw-1")
 	if err == nil {
 		t.Fatal(errExpectedDecode)
+	}
+}
+
+func TestWithContextNilFallback(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, []client.Gateway{})
+	})
+
+	cc := c.WithContext(nil) //nolint:staticcheck // Intentional nil input to validate WithContext fallback behavior.
+	if cc == c {
+		t.Fatal("WithContext should return a shallow copy")
+	}
+
+	if _, err := cc.ListGateways(); err != nil {
+		t.Fatalf(errFmtUnexpected, err)
+	}
+}
+
+func TestWithContextUsesProvidedContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("request should not be sent when context is already canceled")
+	})
+
+	err := c.WithContext(ctx).StartGateway("gw-1")
+	if err == nil {
+		t.Fatal("expected context cancellation error, got nil")
+	}
+}
+
+func TestAddSensorPayloadEncodeError(t *testing.T) {
+	c := client.New("http://example.invalid")
+	_, err := c.AddSensor("gw-1", client.AddSensorRequest{
+		Type:      "temperature",
+		MinRange:  math.NaN(),
+		MaxRange:  100,
+		Algorithm: "constant",
+	})
+	if err == nil {
+		t.Fatal("expected payload encode error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to encode payload") {
+		t.Fatalf(errFmtUnexpected, err)
+	}
+}
+
+func TestListGatewaysInvalidBaseURL(t *testing.T) {
+	c := client.New("://bad-url")
+	_, err := c.ListGateways()
+	if err == nil {
+		t.Fatal("expected build request error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to build request") {
+		t.Fatalf(errFmtUnexpected, err)
 	}
 }
