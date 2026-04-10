@@ -119,8 +119,20 @@ func TestGatewaysBulkFlagToJSONMapping(t *testing.T) {
 			t.Errorf(fmtUnexpectedRequest, r.Method, r.URL.Path)
 		}
 		body := readBody(t, r)
-		checkKey(t, body, "count", float64(5))
-		checkKey(t, body, "factoryId", "fac-bulk")
+		checkAbsent(t, body, "count")
+		checkAbsent(t, body, "factoryId")
+
+		rawFactoryIDs, ok := body["factoryIds"].([]any)
+		if !ok {
+			t.Fatalf("factoryIds must be an array, got %#v", body["factoryIds"])
+		}
+		if len(rawFactoryIDs) != 2 {
+			t.Fatalf("want 2 factoryIds, got %d", len(rawFactoryIDs))
+		}
+		if rawFactoryIDs[0] != "fac-bulk-1" || rawFactoryIDs[1] != "fac-bulk-2" {
+			t.Fatalf("unexpected factoryIds payload: %#v", rawFactoryIDs)
+		}
+
 		checkKey(t, body, "factoryKey", "key-bulk")
 		checkKey(t, body, "model", "GW-MINI")
 		checkKey(t, body, "firmwareVersion", "1.2.3")
@@ -133,8 +145,8 @@ func TestGatewaysBulkFlagToJSONMapping(t *testing.T) {
 	})
 
 	err := runCmd("gateways", "bulk",
-		"--count", "5",
-		testFlagFactoryID, "fac-bulk",
+		testFlagFactoryID, "fac-bulk-1",
+		testFlagFactoryID, "fac-bulk-2",
 		testFlagFactoryKey, "key-bulk",
 		testFlagModel, "GW-MINI",
 		testFlagFirmware, "1.2.3",

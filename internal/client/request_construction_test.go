@@ -142,8 +142,20 @@ func TestBulkCreateGatewaysRequestConstruction(t *testing.T) {
 		assertContentType(t, r)
 
 		body := readBodyAsMap(t, r)
-		assertKey(t, body, "count", float64(3))
-		assertKey(t, body, "factoryId", "fac-bulk")
+		assertKeyAbsent(t, body, "count")
+		assertKeyAbsent(t, body, "factoryId")
+
+		rawFactoryIDs, ok := body["factoryIds"].([]any)
+		if !ok {
+			t.Fatalf("factoryIds should be an array, got %#v", body["factoryIds"])
+		}
+		if len(rawFactoryIDs) != 3 {
+			t.Fatalf("factoryIds length = %d, want 3", len(rawFactoryIDs))
+		}
+		if rawFactoryIDs[0] != "fac-bulk-1" || rawFactoryIDs[1] != "fac-bulk-2" || rawFactoryIDs[2] != "fac-bulk-3" {
+			t.Fatalf("unexpected factoryIds payload: %#v", rawFactoryIDs)
+		}
+
 		assertKey(t, body, "factoryKey", "key-bulk")
 		assertKey(t, body, "model", "GW-BULK")
 		assertKey(t, body, "firmwareVersion", "1.0.0")
@@ -156,8 +168,7 @@ func TestBulkCreateGatewaysRequestConstruction(t *testing.T) {
 	})
 
 	_, err := c.BulkCreateGateways(client.BulkCreateGatewaysRequest{
-		Count:           3,
-		FactoryID:       "fac-bulk",
+		FactoryIDs:      []string{"fac-bulk-1", "fac-bulk-2", "fac-bulk-3"},
 		FactoryKey:      "key-bulk",
 		Model:           "GW-BULK",
 		FirmwareVersion: "1.0.0",
@@ -176,7 +187,7 @@ func TestBulkCreateGatewaysOptionalFieldsOmittedWhenZero(t *testing.T) {
 		assertKeyAbsent(t, body, "sendFrequencyMs")
 		writeJSON(w, http.StatusCreated, client.BulkCreateResponse{})
 	})
-	_, _ = c.BulkCreateGateways(client.BulkCreateGatewaysRequest{Count: 1, FactoryID: "f", FactoryKey: "k"})
+	_, _ = c.BulkCreateGateways(client.BulkCreateGatewaysRequest{FactoryIDs: []string{"f"}, FactoryKey: "k"})
 }
 
 // ── GET /sim/gateways — no body ───────────────────────────────────────────────

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/NoTIPswe/notip-simulator-cli/internal/client"
 	"github.com/pterm/pterm"
@@ -123,15 +124,20 @@ var gatewaysBulkCmd = &cobra.Command{
 	Short: "Create multiple gateways at once (POST /sim/gateways/bulk)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		req := client.BulkCreateGatewaysRequest{}
-		req.Count, _ = cmd.Flags().GetInt("count")
-		req.FactoryID, _ = cmd.Flags().GetString(flagFactoryID)
+		factoryIDs, _ := cmd.Flags().GetStringSlice(flagFactoryID)
+		factoryIDs = normalizeFactoryIDs(factoryIDs)
+		if len(factoryIDs) == 0 {
+			return fmt.Errorf("at least one --factory-id is required")
+		}
+		req.FactoryIDs = factoryIDs
+
 		req.FactoryKey, _ = cmd.Flags().GetString(flagFactoryKey)
 		req.Model, _ = cmd.Flags().GetString("model")
 		req.FirmwareVersion, _ = cmd.Flags().GetString("firmware")
 		req.SendFrequencyMs, _ = cmd.Flags().GetInt("freq")
 
 		spinner := startSpinner(
-			fmt.Sprintf("Creating %d gateway(s)...", req.Count),
+			fmt.Sprintf("Creating %d gateway(s)...", len(req.FactoryIDs)),
 		)
 		c := client.New(simulatorURL).WithContext(cmd.Context())
 		result, err := c.BulkCreateGateways(req)
@@ -252,6 +258,17 @@ func gatewayUUID(gw client.Gateway) string {
 	return gw.ID
 }
 
+func normalizeFactoryIDs(factoryIDs []string) []string {
+	out := make([]string, 0, len(factoryIDs))
+	for _, factoryID := range factoryIDs {
+		trimmed := strings.TrimSpace(factoryID)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
 // ── init ──────────────────────────────────────────────────────────────────────
 
 func init() {
@@ -277,13 +294,12 @@ func init() {
 	}
 
 	// bulk flags
-	gatewaysBulkCmd.Flags().Int("count", 1, "Number of gateways to create (required)")
-	gatewaysBulkCmd.Flags().String(flagFactoryID, "", "Factory ID (required)")
+	gatewaysBulkCmd.Flags().StringSlice(flagFactoryID, nil, "Factory ID (required, repeat flag to create one gateway per ID)")
 	gatewaysBulkCmd.Flags().String(flagFactoryKey, "", "Factory key (required)")
 	gatewaysBulkCmd.Flags().String("model", "", "Gateway model (required)")
 	gatewaysBulkCmd.Flags().String("firmware", "", "Firmware version (required)")
 	gatewaysBulkCmd.Flags().Int("freq", 1000, "Send frequency in milliseconds (required)")
-	for _, f := range []string{"count", flagFactoryID, flagFactoryKey, "model", "firmware", "freq"} {
+	for _, f := range []string{flagFactoryID, flagFactoryKey, "model", "firmware", "freq"} {
 		mustMarkRequired(gatewaysBulkCmd, f)
 	}
 }

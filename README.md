@@ -30,10 +30,11 @@ docker compose run --rm sim-cli gateways create \
   --firmware 1.0.0 \
   --freq 1000
 
-# Bulk create 5 gateways
+# Bulk create gateways with one shared config and multiple factory IDs
 docker compose run --rm sim-cli gateways bulk \
-  --count 5 \
   --factory-id FAC-001 \
+  --factory-id FAC-002 \
+  --factory-id FAC-003 \
   --factory-key KEY-001 \
   --model GW-X \
   --firmware 1.0.0 \

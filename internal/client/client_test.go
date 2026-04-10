@@ -111,13 +111,13 @@ func TestBulkCreateGatewaysAllSuccess(t *testing.T) {
 
 		var req client.BulkCreateGatewaysRequest
 		decodeBody(t, r, &req)
-		if req.Count != 2 {
-			t.Errorf("count = %d, want 2", req.Count)
+		if len(req.FactoryIDs) != 2 {
+			t.Errorf("factoryIds length = %d, want 2", len(req.FactoryIDs))
 		}
 		writeJSON(w, http.StatusCreated, want)
 	})
 
-	got, err := c.BulkCreateGateways(client.BulkCreateGatewaysRequest{Count: 2, FactoryID: "f", FactoryKey: "k"})
+	got, err := c.BulkCreateGateways(client.BulkCreateGatewaysRequest{FactoryIDs: []string{"f-1", "f-2"}, FactoryKey: "k"})
 	if err != nil {
 		t.Fatalf(errFmtUnexpected, err)
 	}
@@ -135,7 +135,7 @@ func TestBulkCreateGatewaysPartialErrors207(t *testing.T) {
 		writeJSON(w, http.StatusMultiStatus, want)
 	})
 
-	got, err := c.BulkCreateGateways(client.BulkCreateGatewaysRequest{Count: 2, FactoryID: "f", FactoryKey: "k"})
+	got, err := c.BulkCreateGateways(client.BulkCreateGatewaysRequest{FactoryIDs: []string{"f-1", "f-2"}, FactoryKey: "k"})
 	if err != nil {
 		t.Fatalf("unexpected error on 207: %v", err)
 	}
@@ -497,8 +497,7 @@ func TestBulkCreateGatewaysInvalidJSONResponse(t *testing.T) {
 	})
 
 	_, err := c.BulkCreateGateways(client.BulkCreateGatewaysRequest{
-		Count:      1,
-		FactoryID:  "f-1",
+		FactoryIDs: []string{"f-1"},
 		FactoryKey: "k-1",
 	})
 	if err == nil {
