@@ -62,7 +62,11 @@ const (
 // process, which would otherwise cause test pollution when the full suite runs.
 func resetAllFlags(c *cobra.Command) {
 	c.Flags().VisitAll(func(f *pflag.Flag) {
-		_ = f.Value.Set(f.DefValue)
+		if slice, ok := f.Value.(interface{ Replace([]string) error }); ok {
+			_ = slice.Replace(nil)
+		} else {
+			_ = f.Value.Set(f.DefValue)
+		}
 		f.Changed = false
 	})
 	for _, child := range c.Commands() {
@@ -141,15 +145,14 @@ func TestGatewaysCreateMissingRequiredFlags(t *testing.T) {
 	}
 }
 
-func TestGatewaysBulkMissingCount(t *testing.T) {
+func TestGatewaysBulkMissingFactoryID(t *testing.T) {
 	if err := runCmd("gateways", "bulk",
-		testFlagFactoryID, "f",
 		testFlagFactoryKey, "k",
 		testFlagModel, "GW-X",
 		testFlagFirmware, "1.0.0",
 		testFlagFreq, "1000",
 	); err == nil {
-		t.Error("expected error when --count is missing")
+		t.Error("expected error when --factory-id is missing")
 	}
 }
 
@@ -438,8 +441,8 @@ func TestGatewaysBulkServerError(t *testing.T) {
 		http.Error(w, "server error", http.StatusInternalServerError)
 	})
 	err := runCmd("gateways", "bulk",
-		"--count", "2",
-		testFlagFactoryID, "f",
+		testFlagFactoryID, "f-1",
+		testFlagFactoryID, "f-2",
 		testFlagFactoryKey, "k",
 		testFlagModel, "GW-X",
 		testFlagFirmware, "1.0.0",
@@ -458,8 +461,8 @@ func TestGatewaysBulkPartialErrors(t *testing.T) {
 		})
 	})
 	err := runCmd("gateways", "bulk",
-		"--count", "2",
-		testFlagFactoryID, "f",
+		testFlagFactoryID, "f-1",
+		testFlagFactoryID, "f-2",
 		testFlagFactoryKey, "k",
 		testFlagModel, "GW-X",
 		testFlagFirmware, "1.0.0",

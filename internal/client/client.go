@@ -60,12 +60,11 @@ type CreateGatewayRequest struct {
 
 // BulkCreateGatewaysRequest is the payload for POST /sim/gateways/bulk.
 type BulkCreateGatewaysRequest struct {
-	Count           int    `json:"count"`
-	FactoryID       string `json:"factoryId"`
-	FactoryKey      string `json:"factoryKey"`
-	Model           string `json:"model,omitempty"`
-	FirmwareVersion string `json:"firmwareVersion,omitempty"`
-	SendFrequencyMs int    `json:"sendFrequencyMs,omitempty"`
+	FactoryIDs      []string `json:"factoryIds"`
+	FactoryKey      string   `json:"factoryKey"`
+	Model           string   `json:"model,omitempty"`
+	FirmwareVersion string   `json:"firmwareVersion,omitempty"`
+	SendFrequencyMs int      `json:"sendFrequencyMs,omitempty"`
 }
 
 // BulkCreateResponse is the response for POST /sim/gateways/bulk.

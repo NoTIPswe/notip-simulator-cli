@@ -26,7 +26,11 @@ func Execute() error {
 // Cobra flag state is sticky within the same process, which affects shell mode.
 func resetAllCommandFlags(c *cobra.Command) {
 	c.Flags().VisitAll(func(f *pflag.Flag) {
-		_ = f.Value.Set(f.DefValue)
+		if slice, ok := f.Value.(interface{ Replace([]string) error }); ok {
+			_ = slice.Replace(nil)
+		} else {
+			_ = f.Value.Set(f.DefValue)
+		}
 		f.Changed = false
 	})
 	for _, child := range c.Commands() {
