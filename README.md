@@ -16,11 +16,16 @@ The CLI is packaged as an ephemeral Docker container. It is spun up on demand, r
 docker compose run --rm sim-cli --help
 ```
 
+---
+
 ### Gateways
 
 ```bash
 # List all gateways (requires -it for styled output)
 docker compose run --rm -it sim-cli gateways list
+
+# Show details for a single gateway
+docker compose run --rm -it sim-cli gateways get <gateway-uuid>
 
 # Create a single gateway
 docker compose run --rm sim-cli gateways create \
@@ -40,27 +45,79 @@ docker compose run --rm sim-cli gateways bulk \
   --firmware 1.0.0 \
   --freq 1000
 
+# Start telemetry emission for a gateway
+docker compose run --rm sim-cli gateways start <gateway-uuid>
+
+# Stop telemetry emission for a gateway
+docker compose run --rm sim-cli gateways stop <gateway-uuid>
+
 # Delete a gateway by UUID
 docker compose run --rm sim-cli gateways delete <gateway-uuid>
 ```
 
+---
+
 ### Sensors
 
 ```bash
-# Add a temperature sensor to a gateway (numeric ID or UUID)
-docker compose run --rm sim-cli sensors add <gateway-id-or-uuid> \
+# List all sensors for a gateway
+docker compose run --rm -it sim-cli sensors list <gateway-uuid>
+
+# Add a sensor to a gateway
+docker compose run --rm sim-cli sensors add <gateway-uuid> \
   --type temperature \
   --min 20.0 \
   --max 80.0 \
   --algorithm uniform_random
+
+# Delete a sensor by UUID
+docker compose run --rm sim-cli sensors delete <sensor-uuid>
 ```
+
+**Sensor types:** `temperature` | `humidity` | `pressure` | `movement` | `biometric`
+
+**Generation algorithms:** `uniform_random` | `sine_wave` | `spike` | `constant`
+
+---
 
 ### Anomalies
 
 ```bash
-# Trigger a disconnect anomaly on a gateway
+# Simulate a gateway disconnect for a given duration (seconds)
 docker compose run --rm sim-cli anomalies disconnect <gateway-uuid> --duration 10
+
+# Simulate network degradation (packet loss) on a gateway
+docker compose run --rm sim-cli anomalies network-degradation <gateway-uuid> \
+  --duration 30 \
+  --packet-loss 0.3   # fraction 0–1; omit to use backend default (0.3)
+
+# Inject an outlier reading into a sensor
+docker compose run --rm sim-cli anomalies outlier <sensor-uuid>
+docker compose run --rm sim-cli anomalies outlier <sensor-uuid> --value 999.9
 ```
+
+---
+
+### Interactive shell
+
+Start a persistent REPL session to run multiple commands without restarting the container:
+
+```bash
+docker compose run --rm -it sim-cli shell
+```
+
+Inside the shell, type commands directly (without the `sim-cli` prefix):
+
+```
+sim-cli> gateways list
+sim-cli> sensors list <gateway-uuid>
+sim-cli> anomalies disconnect <uuid> --duration 5
+sim-cli> exit
+```
+
+Type `exit` or press `Ctrl+D` to quit.
+
+---
 
 ## Docker Compose configuration
 
