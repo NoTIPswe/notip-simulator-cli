@@ -1,3 +1,15 @@
+# [2.0.0](https://github.com/NoTIPswe/notip-simulator-cli/compare/v1.3.0...v2.0.0) (2026-04-11)
+
+
+### Bug Fixes
+
+* update README ([aa63471](https://github.com/NoTIPswe/notip-simulator-cli/commit/aa6347151bb147be234ab66ccadc3548ad2a0ce9))
+
+
+### BREAKING CHANGES
+
+* new version
+
 # [1.3.0](https://github.com/NoTIPswe/notip-simulator-cli/compare/v1.2.0...v1.3.0) (2026-04-10)
 
 
