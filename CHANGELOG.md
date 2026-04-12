@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/NoTIPswe/notip-simulator-cli/compare/v2.0.0...v2.0.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* update project title and add badges in README ([49fd9a8](https://github.com/NoTIPswe/notip-simulator-cli/commit/49fd9a896347db0a9c4e867fe64df49d39796e26))
+
 # [2.0.0](https://github.com/NoTIPswe/notip-simulator-cli/compare/v1.3.0...v2.0.0) (2026-04-11)
 
 
