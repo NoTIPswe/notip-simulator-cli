@@ -1,4 +1,6 @@
-# sim-cli — NoTIP Simulator CLI
+# notip-sim-cli
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=NoTIPswe_notip-simulator-frontend&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=NoTIPswe_notip-simulator-frontend)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=NoTIPswe_notip-simulator-frontend&metric=coverage)](https://sonarcloud.io/summary/new_code?id=NoTIPswe_notip-simulator-frontend)
 
 A Go-based CLI for managing the NoTIP Simulator: gateways, sensors, and anomaly triggers.
 
