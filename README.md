@@ -20,6 +20,8 @@ docker compose run --rm sim-cli --help
 
 ### Gateways
 
+> **Prerequisite:** before creating a simulated gateway, a tenant admin must have already registered a gateway entry (with the matching `factory-id` and `factory-key`) in the dashboard. Only pre-registered gateways are allowed to be provisioned by the application.
+
 ```bash
 # List all gateways (requires -it for styled output)
 docker compose run --rm -it sim-cli gateways list
@@ -58,6 +60,8 @@ docker compose run --rm sim-cli gateways delete <gateway-uuid>
 ---
 
 ### Sensors
+
+> **Prerequisite:** the gateway must already exist. Use its UUID, which is shared between the CLI and the backend (visible via `gateways list` and matching the ID shown in the dashboard).
 
 ```bash
 # List all sensors for a gateway
